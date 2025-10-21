@@ -32,56 +32,68 @@
       </div>
     </div>
 
-    <div v-if="certDialogVisible" class="cert-dialog-overlay" @click="certDialogVisible = false">
-      <div class="cert-dialog" @click.stop>
-        <h3>🔒 NetCaptor HTTPS 证书</h3>
-        <p>要捕获 HTTPS 请求，需要安装并信任此 CA 证书。</p>
-        <div class="cert-path">
-          <strong>证书位置:</strong>
-          <code>{{ certPath }}</code>
+    <div v-if="certDialogVisible" class="drawer-overlay" @click="certDialogVisible = false">
+      <div class="drawer" @click.stop>
+        <div class="drawer-header">
+          <h3>🔒 NetCaptor HTTPS 证书</h3>
+          <button @click="certDialogVisible = false" class="close-icon">✕</button>
         </div>
-        <div class="install-steps">
-          <h4>Windows 安装步骤:</h4>
-          <ol>
-            <li>双击 goproxy-ca.crt 文件</li>
-            <li>点击“安装证书”</li>
-            <li>选择“当前用户”</li>
-            <li>选择“将所有证书放入下列存储”</li>
-            <li>浏览并选择“受信任的根证书颁发机构”</li>
-            <li>完成安装并重启浏览器</li>
-          </ol>
-          <h4>macOS 安装步骤:</h4>
-          <ol>
-            <li>双击 goproxy-ca.crt 文件</li>
-            <li>在钥匙串访问中找到 "NetCaptor CA"</li>
-            <li>双击证书，展开“信任”</li>
-            <li>选择“始终信任”</li>
-            <li>重启浏览器</li>
-          </ol>
-          <h4>Linux/Ubuntu 安装步骤:</h4>
-          <p><strong>方法1: 系统级安装（推荐）</strong></p>
-          <pre>sudo cp {{ certPath }} /usr/local/share/ca-certificates/goproxy.crt
+        <div class="drawer-content">
+          <p>要捕获 HTTPS 请求，需要安装并信任此 CA 证书。</p>
+          
+          <div class="cert-path">
+            <strong>证书位置:</strong>
+            <code>{{ certPath }}</code>
+          </div>
+
+          <div class="install-steps">
+            <h4>Windows 安装步骤</h4>
+            <ol>
+              <li>双击 goproxy-ca.crt 文件</li>
+              <li>点击"安装证书"</li>
+              <li>选择"当前用户"</li>
+              <li>选择"将所有证书放入下列存储"</li>
+              <li>浏览并选择"受信任的根证书颁发机构"</li>
+              <li>完成安装并重启浏览器</li>
+            </ol>
+
+            <h4>macOS 安装步骤</h4>
+            <ol>
+              <li>双击 goproxy-ca.crt 文件</li>
+              <li>在钥匙串访问中找到 "NetCaptor CA"</li>
+              <li>双击证书，展开"信任"</li>
+              <li>选择"始终信任"</li>
+              <li>重启浏览器</li>
+            </ol>
+
+            <h4>Linux/Ubuntu 安装步骤</h4>
+            
+            <p><strong>方法1: 系统级安装（推荐）</strong></p>
+            <pre>sudo cp {{ certPath }} /usr/local/share/ca-certificates/goproxy.crt
 sudo update-ca-certificates
 # 重启浏览器</pre>
-          <p><strong>方法2: Chrome/Chromium 专用</strong></p>
-          <pre>mkdir -p $HOME/.pki/nssdb
+
+            <p><strong>方法2: Chrome/Chromium 专用</strong></p>
+            <pre>mkdir -p $HOME/.pki/nssdb
 certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "GoProxy CA" -i {{ certPath }}
 # 如果没有certutil，先安装: sudo apt install libnss3-tools
 # 重启浏览器</pre>
-          <p><strong>方法3: 临时测试（不推荐）</strong></p>
-          <p>启动Chrome时添加参数忽略证书错误：</p>
-          <pre>google-chrome --proxy-server="127.0.0.1:8888" --ignore-certificate-errors</pre>
-          <h4>Chrome 快捷方式:</h4>
-          <ol>
-            <li>打开 Chrome 设置</li>
-            <li>搜索“证书”</li>
-            <li>点击“管理证书”</li>
-            <li>选择“受信任的根证书颁发机构”</li>
-            <li>点击“导入”，选择 goproxy-ca.crt</li>
-            <li>重启浏览器</li>
-          </ol>
+
+            <p><strong>方法3: 临时测试（不推荐）</strong></p>
+            <p>启动Chrome时添加参数忽略证书错误：</p>
+            <pre>google-chrome --proxy-server="127.0.0.1:8888" --ignore-certificate-errors</pre>
+
+            <h4>Chrome 快捷方式</h4>
+            <ol>
+              <li>打开 Chrome 设置</li>
+              <li>搜索"证书"</li>
+              <li>点击"管理证书"</li>
+              <li>选择"受信任的根证书颁发机构"</li>
+              <li>点击"导入"，选择 goproxy-ca.crt</li>
+              <li>重启浏览器</li>
+            </ol>
+          </div>
         </div>
-        <button @click="certDialogVisible = false" class="close-btn">关闭</button>
       </div>
     </div>
 
@@ -148,7 +160,7 @@ certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "GoProxy CA" -i {{ certPath }}
       <div class="details-content">
         <div v-if="activeTab === 'headers'" class="headers-view">
           <div class="section">
-            <h4>General</h4>
+            <h4>常规</h4>
             <div class="kv-list">
               <div class="kv-item"><span class="key">Request URL:</span><span class="value">{{ selectedEntry.url }}</span></div>
               <div class="kv-item"><span class="key">Request Method:</span><span class="value">{{ selectedEntry.method }}</span></div>
@@ -156,7 +168,7 @@ certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "GoProxy CA" -i {{ certPath }}
             </div>
           </div>
           <div class="section" v-if="selectedEntry.request.headers">
-            <h4>Request Headers</h4>
+            <h4>请求标头</h4>
             <div class="kv-list">
               <div class="kv-item" v-for="(value, key) in selectedEntry.request.headers" :key="key">
                 <span class="key">{{ key }}:</span><span class="value">{{ value }}</span>
@@ -164,7 +176,7 @@ certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "GoProxy CA" -i {{ certPath }}
             </div>
           </div>
           <div class="section" v-if="selectedEntry.response.headers">
-            <h4>Response Headers</h4>
+            <h4>响应标头</h4>
             <div class="kv-list">
               <div class="kv-item" v-for="(value, key) in selectedEntry.response.headers" :key="key">
                 <span class="key">{{ key }}:</span><span class="value">{{ value }}</span>
@@ -269,7 +281,6 @@ async function openBrowser() {
 
 function selectEntry(entry: any) {
   selectedEntry.value = entry
-  activeTab.value = 'headers'
 }
 
 function exportData() {
@@ -295,7 +306,6 @@ function getPath(url: string) {
   try {
     const u = new URL(url)
     let path = u.pathname
-    // 如果有查询参数，也显示出来
     if (u.search) {
       path += u.search
     }
@@ -508,8 +518,6 @@ function showCertDialog() {
   box-shadow: 0 0 0 1px #1a73e8;
 }
 
-
-
 .network-table {
   flex: 1;
   display: flex;
@@ -559,6 +567,7 @@ function showCertDialog() {
 .col-path {
   flex: 1;
   min-width: 0;
+  text-align: left;
 }
 
 .col-status { width: 60px; }
@@ -676,6 +685,7 @@ function showCertDialog() {
   font-size: 13px;
   font-weight: 600;
   color: #5f6368;
+  text-align: left;
 }
 
 .kv-list {
@@ -687,17 +697,22 @@ function showCertDialog() {
   display: flex;
   padding: 2px 0;
   line-height: 1.6;
+  gap: 8px;
 }
 
 .kv-item .key {
   color: #881280;
-  min-width: 150px;
+  min-width: 180px;
   flex-shrink: 0;
+  text-align: right;
+  padding-right: 4px;
 }
 
 .kv-item .value {
   color: #1a1aa6;
   word-break: break-all;
+  text-align: left;
+  flex: 1;
 }
 
 .payload-view pre,
@@ -719,37 +734,84 @@ function showCertDialog() {
   color: #80868b;
 }
 
-.cert-dialog-overlay {
+.drawer-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   z-index: 1000;
 }
 
-.cert-dialog {
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 600px;
   background: white;
-  padding: 24px;
-  border-radius: 8px;
-  max-width: 600px;
-  max-height: 80vh;
-  overflow-y: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.3s ease-out;
 }
 
-.cert-dialog h3 {
-  margin: 0 0 16px 0;
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+.drawer-header h3 {
+  margin: 0;
+  font-size: 16px;
   color: #333;
 }
 
-.cert-dialog p {
+.close-icon {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: #5f6368;
+  cursor: pointer;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.close-icon:hover {
+  background: #e8eaed;
+}
+
+.drawer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  text-align: left;
+}
+
+.drawer-content > p {
   color: #666;
   margin-bottom: 16px;
+  line-height: 1.6;
+  text-align: left;
 }
 
 .cert-path {
@@ -757,30 +819,56 @@ function showCertDialog() {
   padding: 12px;
   border-radius: 4px;
   margin-bottom: 16px;
+  text-align: left;
+}
+
+.cert-path strong {
+  display: block;
+  margin-bottom: 8px;
 }
 
 .cert-path code {
   display: block;
-  margin-top: 8px;
   padding: 8px;
   background: white;
   border: 1px solid #e0e0e0;
   border-radius: 4px;
   font-size: 12px;
   word-break: break-all;
+  text-align: left;
+}
+
+.install-steps {
+  text-align: left;
 }
 
 .install-steps h4 {
-  margin: 16px 0 8px 0;
+  margin: 24px 0 12px 0;
   color: #333;
   font-size: 14px;
+  font-weight: 600;
+  text-align: left;
 }
 
 .install-steps ol {
-  margin: 0 0 16px 0;
-  padding-left: 20px;
+  margin: 0 0 20px 0;
+  padding-left: 24px;
   font-size: 13px;
+  line-height: 1.8;
+  color: #333;
+  text-align: left;
+}
+
+.install-steps ol li {
+  margin-bottom: 6px;
+  text-align: left;
+}
+
+.install-steps p {
+  margin: 12px 0 8px 0;
+  color: #666;
   line-height: 1.6;
+  text-align: left;
 }
 
 .install-steps pre {
@@ -790,21 +878,8 @@ function showCertDialog() {
   border-radius: 4px;
   font-size: 11px;
   overflow-x: auto;
-}
-
-.close-btn {
-  width: 100%;
-  padding: 10px;
-  background: #1a73e8;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  margin-top: 16px;
-}
-
-.close-btn:hover {
-  background: #1557b0;
+  margin: 8px 0 16px 0;
+  line-height: 1.5;
+  text-align: left;
 }
 </style>
