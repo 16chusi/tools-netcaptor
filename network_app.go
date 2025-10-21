@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"os"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type NetworkApp struct {
@@ -132,21 +134,9 @@ func (na *NetworkApp) GetCACertPath() string {
 	return na.proxy.GetCACertPath()
 }
 
-// 导出HAR格式
-func (na *NetworkApp) ExportHAR() (string, error) {
-	// 简化版HAR导出
-	requests := na.capture.GetRequests()
-	responses := na.capture.GetResponses()
-
-	return fmt.Sprintf(`{
-  "log": {
-    "version": "1.2",
-    "creator": {"name": "NetworkCapture", "version": "1.0"},
-    "entries": %d,
-    "requests": %d,
-    "responses": %d
-  }
-}`, len(requests)+len(responses), len(requests), len(responses)), nil
+// 导出数据
+func (na *NetworkApp) ExportData(entriesJSON string) error {
+	return ExportToFile(na.ctx, entriesJSON)
 }
 
 // 在Chrome中打开URL
@@ -165,4 +155,41 @@ func (na *NetworkApp) OpenInEdge(url string) error {
 func (na *NetworkApp) OpenInFirefox(url string) error {
 	proxyURL := na.proxy.GetProxyURL()
 	return OpenInFirefox(url, proxyURL)
+}
+
+// 下载响应内容
+func (na *NetworkApp) DownloadResponse(url string, filename string) error {
+	return DownloadFile(na.ctx, url, filename)
+}
+
+// 选择下载目录
+func (na *NetworkApp) SelectDownloadDirectory() (string, error) {
+	path, err := runtime.OpenDirectoryDialog(na.ctx, runtime.OpenDialogOptions{
+		Title: "选择下载目录",
+	})
+	return path, err
+}
+
+// 导出到文件
+func ExportToFile(ctx context.Context, data string) error {
+	// 弹出保存对话框
+	savePath, err := runtime.SaveFileDialog(ctx, runtime.SaveDialogOptions{
+		DefaultFilename: "network-capture.json",
+		Title:           "导出网络数据",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "JSON Files (*.json)", Pattern: "*.json"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if savePath == "" {
+		return nil // 用户取消
+	}
+
+	// 写入文件
+	return os.WriteFile(savePath, []byte(data), 0644)
 }

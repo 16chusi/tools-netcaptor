@@ -41,8 +41,8 @@ func NewCertManager() (*CertManager, error) {
 }
 
 func (cm *CertManager) loadOrGenerateCA() error {
-	caFile := filepath.Join(cm.certDir, "ca.crt")
-	keyFile := filepath.Join(cm.certDir, "ca.key")
+	caFile := filepath.Join(cm.certDir, "netcaptor-ca.crt")
+	keyFile := filepath.Join(cm.certDir, "netcaptor-ca.key")
 
 	// 尝试加载现有证书
 	if _, err := os.Stat(caFile); err == nil {
@@ -104,8 +104,8 @@ func (cm *CertManager) generateCA() error {
 	cm.caKey = key
 
 	// 保存证书
-	caFile := filepath.Join(cm.certDir, "ca.crt")
-	keyFile := filepath.Join(cm.certDir, "ca.key")
+	caFile := filepath.Join(cm.certDir, "netcaptor-ca.crt")
+	keyFile := filepath.Join(cm.certDir, "netcaptor-ca.key")
 
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
@@ -174,7 +174,7 @@ func (cm *CertManager) generateCertForHost(host string) (*tls.Certificate, error
 }
 
 func (cm *CertManager) GetCACertPath() string {
-	return filepath.Join(cm.certDir, "ca.crt")
+	return filepath.Join(cm.certDir, "netcaptor-ca.crt")
 }
 
 func (cm *CertManager) GetCACertPEM() ([]byte, error) {

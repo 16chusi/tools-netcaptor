@@ -14,10 +14,11 @@ import (
 )
 
 type GoProxyServer struct {
-	port    int
-	proxy   *goproxy.ProxyHttpServer
-	capture *NetworkCapture
-	running bool
+	port       int
+	proxy      *goproxy.ProxyHttpServer
+	capture    *NetworkCapture
+	running    bool
+	requestMap map[string]int64
 }
 
 func NewGoProxyServer(port int, capture *NetworkCapture) *GoProxyServer {
@@ -25,9 +26,10 @@ func NewGoProxyServer(port int, capture *NetworkCapture) *GoProxyServer {
 	proxy.Verbose = false
 
 	gps := &GoProxyServer{
-		port:    port,
-		proxy:   proxy,
-		capture: capture,
+		port:       port,
+		proxy:      proxy,
+		capture:    capture,
+		requestMap: make(map[string]int64),
 	}
 
 	// 启用HTTPS MITM
@@ -102,8 +104,11 @@ func (gps *GoProxyServer) recordRequest(req *http.Request) {
 		}
 	}
 
+	reqID := generateID()
+	gps.requestMap[url] = time.Now().UnixMilli()
+
 	reqData := NetworkRequest{
-		ID:      generateID(),
+		ID:      reqID,
 		URL:     url,
 		Method:  req.Method,
 		Headers: headers,
@@ -144,6 +149,13 @@ func (gps *GoProxyServer) recordResponse(req *http.Request, resp *http.Response)
 
 	contentType := resp.Header.Get("Content-Type")
 
+	// 计算耗时
+	var duration int64 = 0
+	if startTime, ok := gps.requestMap[url]; ok {
+		duration = time.Now().UnixMilli() - startTime
+		delete(gps.requestMap, url)
+	}
+
 	respData := NetworkResponse{
 		ID:          generateID(),
 		URL:         url,
@@ -152,6 +164,7 @@ func (gps *GoProxyServer) recordResponse(req *http.Request, resp *http.Response)
 		Headers:     headers,
 		Body:        body,
 		Size:        len(bodyBytes),
+		Duration:    duration,
 		ContentType: contentType,
 	}
 
@@ -166,7 +179,7 @@ func (gps *GoProxyServer) GetCACertPath() string {
 	certDir := filepath.Join(homeDir, ".netcaptor", "certs")
 	os.MkdirAll(certDir, 0755)
 
-	certPath := filepath.Join(certDir, "goproxy-ca.crt")
+	certPath := filepath.Join(certDir, "netcaptor-ca.crt")
 
 	// 保存证书
 	certPEM := pem.EncodeToMemory(&pem.Block{

@@ -6,6 +6,11 @@
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
+  "watcher": {
+    "debounce": 1000,
+    "reloadDirs": ["."],
+    "excludeDirs": ["frontend/node_modules", "frontend/dist", "build"]
+  },
   "author": {
     "name": "fzxs",
     "email": "fzxs8@163.com"

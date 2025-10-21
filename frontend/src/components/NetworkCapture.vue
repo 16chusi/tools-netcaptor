@@ -9,93 +9,46 @@
         <button @click="clearAll" class="icon-btn" title="清空">🗑️</button>
         <input v-model="filterText" placeholder="Filter" class="filter-input" />
         <div class="divider"></div>
-        <input v-model="targetUrl" placeholder="http://localhost:9999" class="url-input" />
+        <div class="filter-tabs">
+          <button :class="['filter-tab', {active: filterType === 'all'}]" @click="filterType = 'all'">全部</button>
+          <button :class="['filter-tab', {active: filterType === 'fetch'}]" @click="filterType = 'fetch'">Fetch/XHR</button>
+          <button :class="['filter-tab', {active: filterType === 'js'}]" @click="filterType = 'js'">JS</button>
+          <button :class="['filter-tab', {active: filterType === 'css'}]" @click="filterType = 'css'">CSS</button>
+          <button :class="['filter-tab', {active: filterType === 'image'}]" @click="filterType = 'image'">图片</button>
+          <button :class="['filter-tab', {active: filterType === 'document'}]" @click="filterType = 'document'">文档</button>
+          <button :class="['filter-tab', {active: filterType === 'other'}]" @click="filterType = 'other'">其他</button>
+        </div>
+        <div class="divider"></div>
         <select v-model="selectedBrowser" class="browser-select">
           <option value="chrome">Chrome</option>
           <option value="edge">Edge</option>
           <option value="firefox">Firefox</option>
         </select>
-        <button @click="openBrowser" class="open-btn">打开</button>
+        <button @click="openBrowser" class="open-btn">打开浏览器</button>
       </div>
       <div class="toolbar-right">
-        <span class="proxy-label">Proxy:</span>
-        <input 
-          v-model.number="proxyPort" 
-          type="number" 
-          class="proxy-port-input" 
-          :disabled="proxyRunning"
-          min="1024"
-          max="65535"
-        />
-        <button @click="showCertDialog" class="icon-btn" title="证书">🔒</button>
+        <button @click="settingsVisible = true" class="icon-btn" title="设置">⚙️</button>
+        <button @click="certDialogVisible = true" class="icon-btn" title="证书">🔒</button>
         <button @click="exportData" class="icon-btn" title="导出">⬇️</button>
       </div>
     </div>
 
-    <div v-if="certDialogVisible" class="drawer-overlay" @click="certDialogVisible = false">
-      <div class="drawer" @click.stop>
-        <div class="drawer-header">
-          <h3>🔒 NetCaptor HTTPS 证书</h3>
-          <button @click="certDialogVisible = false" class="close-icon">✕</button>
-        </div>
-        <div class="drawer-content">
-          <p>要捕获 HTTPS 请求，需要安装并信任此 CA 证书。</p>
-          
-          <div class="cert-path">
-            <strong>证书位置:</strong>
-            <code>{{ certPath }}</code>
-          </div>
+    <SettingsDrawer
+      :visible="settingsVisible"
+      v-model:proxyPort="proxyPort"
+      v-model:selectedBrowser="selectedBrowser"
+      v-model:targetUrl="targetUrl"
+      :downloadPath="downloadPath"
+      :proxyRunning="proxyRunning"
+      @close="settingsVisible = false"
+      @selectPath="selectDownloadPath"
+    />
 
-          <div class="install-steps">
-            <h4>Windows 安装步骤</h4>
-            <ol>
-              <li>双击 goproxy-ca.crt 文件</li>
-              <li>点击"安装证书"</li>
-              <li>选择"当前用户"</li>
-              <li>选择"将所有证书放入下列存储"</li>
-              <li>浏览并选择"受信任的根证书颁发机构"</li>
-              <li>完成安装并重启浏览器</li>
-            </ol>
-
-            <h4>macOS 安装步骤</h4>
-            <ol>
-              <li>双击 goproxy-ca.crt 文件</li>
-              <li>在钥匙串访问中找到 "NetCaptor CA"</li>
-              <li>双击证书，展开"信任"</li>
-              <li>选择"始终信任"</li>
-              <li>重启浏览器</li>
-            </ol>
-
-            <h4>Linux/Ubuntu 安装步骤</h4>
-            
-            <p><strong>方法1: 系统级安装（推荐）</strong></p>
-            <pre>sudo cp {{ certPath }} /usr/local/share/ca-certificates/goproxy.crt
-sudo update-ca-certificates
-# 重启浏览器</pre>
-
-            <p><strong>方法2: Chrome/Chromium 专用</strong></p>
-            <pre>mkdir -p $HOME/.pki/nssdb
-certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "GoProxy CA" -i {{ certPath }}
-# 如果没有certutil，先安装: sudo apt install libnss3-tools
-# 重启浏览器</pre>
-
-            <p><strong>方法3: 临时测试（不推荐）</strong></p>
-            <p>启动Chrome时添加参数忽略证书错误：</p>
-            <pre>google-chrome --proxy-server="127.0.0.1:8888" --ignore-certificate-errors</pre>
-
-            <h4>Chrome 快捷方式</h4>
-            <ol>
-              <li>打开 Chrome 设置</li>
-              <li>搜索"证书"</li>
-              <li>点击"管理证书"</li>
-              <li>选择"受信任的根证书颁发机构"</li>
-              <li>点击"导入"，选择 goproxy-ca.crt</li>
-              <li>重启浏览器</li>
-            </ol>
-          </div>
-        </div>
-      </div>
-    </div>
+    <CertDrawer
+      :visible="certDialogVisible"
+      :certPath="certPath"
+      @close="certDialogVisible = false"
+    />
 
     <div class="network-table">
       <div class="table-header">
@@ -126,7 +79,7 @@ certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "GoProxy CA" -i {{ certPath }}
           </div>
           <div class="col-type">{{ getResourceType(entry) }}</div>
           <div class="col-size">{{ formatSize(entry.size) }}</div>
-          <div class="col-time">{{ entry.duration || '-' }}ms</div>
+          <div class="col-time">{{ entry.duration ? entry.duration + 'ms' : '-' }}</div>
         </div>
         <div v-if="filteredEntries.length === 0" class="empty-state">
           <div v-if="!proxyRunning">
@@ -151,11 +104,13 @@ certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "GoProxy CA" -i {{ certPath }}
       </div>
     </div>
 
-    <div v-if="selectedEntry" class="details-panel">
+    <div v-if="selectedEntry" class="details-panel" :style="{ height: detailsHeight + 'px' }">
+      <div class="resize-handle" @mousedown="startResize"></div>
       <div class="details-tabs">
-        <button :class="['tab', {active: activeTab === 'headers'}]" @click="activeTab = 'headers'">Headers</button>
-        <button :class="['tab', {active: activeTab === 'payload'}]" @click="activeTab = 'payload'">Payload</button>
-        <button :class="['tab', {active: activeTab === 'response'}]" @click="activeTab = 'response'">Response</button>
+        <button :class="['tab', {active: activeTab === 'headers'}]" @click="activeTab = 'headers'">标头</button>
+        <button :class="['tab', {active: activeTab === 'payload'}]" @click="activeTab = 'payload'">载荷</button>
+        <button :class="['tab', {active: activeTab === 'response'}]" @click="activeTab = 'response'">响应</button>
+        <button :class="['tab', {active: activeTab === 'request'}]" @click="activeTab = 'request'">请求</button>
       </div>
       <div class="details-content">
         <div v-if="activeTab === 'headers'" class="headers-view">
@@ -188,8 +143,62 @@ certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "GoProxy CA" -i {{ certPath }}
           <pre v-if="selectedEntry.request.body">{{ selectedEntry.request.body }}</pre>
           <div v-else class="empty">无请求体</div>
         </div>
+        <div v-if="activeTab === 'request'" class="request-view">
+          <div class="request-toolbar">
+            <label>格式:</label>
+            <select v-model="requestFormat" class="format-select">
+              <option value="curl">cURL</option>
+              <option value="powershell">PowerShell</option>
+              <option value="fetch">Fetch</option>
+            </select>
+            <button @click="copyRequest" class="copy-request-btn">复制</button>
+          </div>
+          <pre class="request-code">{{ generateRequestCode() }}</pre>
+        </div>
         <div v-if="activeTab === 'response'" class="response-view">
-          <pre v-if="selectedEntry.response.body">{{ selectedEntry.response.body }}</pre>
+          <div v-if="selectedEntry.response.body" class="response-container">
+            <div class="response-toolbar">
+              <div class="toolbar-left-section">
+                <span class="format-label">格式: <strong>{{ getFormatType(selectedEntry.response?.contentType || '') }}</strong></span>
+                <div class="view-mode">
+                  <label>查看方式:</label>
+                  <select v-model="viewMode" class="view-select">
+                    <option value="auto">自动</option>
+                    <option value="text">文本</option>
+                    <option value="json">JSON</option>
+                    <option value="html">HTML</option>
+                    <option value="image">图片</option>
+                    <option value="pdf">PDF</option>
+                    <option value="hex">十六进制</option>
+                    <option value="base64">Base64</option>
+                  </select>
+                </div>
+              </div>
+              <button @click="saveResponse" class="save-btn">下载</button>
+            </div>
+            <div v-if="currentViewMode === 'image'" class="image-preview">
+              <img :src="selectedEntry.url" alt="Response Image" @error="handleImageError" />
+            </div>
+            <div v-else-if="currentViewMode === 'pdf'" class="pdf-preview">
+              <div class="pdf-actions">
+                <button @click="openInBrowser" class="action-btn">在浏览器中打开</button>
+                <button @click="downloadAndOpen" class="action-btn">下载并打开</button>
+              </div>
+              <div class="pdf-info">
+                <p>PDF 文件无法在应用内预览</p>
+                <p>请使用上方按钮在浏览器中打开或下载后查看</p>
+                <div class="url-container">
+                  <code>{{ selectedEntry.url }}</code>
+                  <button @click="copyUrl" class="copy-btn" title="复制链接">📋</button>
+                </div>
+              </div>
+            </div>
+            <pre v-else-if="currentViewMode === 'json'" class="json-preview">{{ formatJSON(selectedEntry.response.body) }}</pre>
+            <div v-else-if="currentViewMode === 'html'" class="html-preview" v-html="selectedEntry.response.body"></div>
+            <pre v-else-if="currentViewMode === 'hex'" class="text-preview">{{ toHex(selectedEntry.response.body) }}</pre>
+            <pre v-else-if="currentViewMode === 'base64'" class="text-preview">{{ toBase64(selectedEntry.response.body) }}</pre>
+            <pre v-else class="text-preview">{{ selectedEntry.response.body }}</pre>
+          </div>
           <div v-else class="empty">无响应体</div>
         </div>
       </div>
@@ -199,7 +208,13 @@ certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "GoProxy CA" -i {{ certPath }}
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { GetAllEntries, ClearCapture, StartProxy, StartProxyWithPort, StopProxy, IsProxyRunning, GetProxyURL, GetCACertPath, OpenInChrome, OpenInEdge, OpenInFirefox } from '../../wailsjs/go/main/NetworkApp'
+import { GetAllEntries, ClearCapture, StartProxyWithPort, StopProxy, IsProxyRunning, GetProxyURL, GetCACertPath, OpenInChrome, OpenInEdge, OpenInFirefox, DownloadResponse, ExportData, SelectDownloadDirectory } from '../../wailsjs/go/main/NetworkApp'
+import { BrowserOpenURL } from '../../wailsjs/runtime/runtime'
+import { getDomain, getPath, getResourceType, getStatusClass, formatSize, getFormatType } from '../utils/networkUtils'
+import { generateCurl, generatePowerShell, generateFetch } from '../utils/codeGenerator'
+import { formatJSON, toHex, toBase64 } from '../utils/formatters'
+import SettingsDrawer from './SettingsDrawer.vue'
+import CertDrawer from './CertDrawer.vue'
 
 const entries = ref<any[]>([])
 const selectedEntry = ref<any>(null)
@@ -207,20 +222,53 @@ const activeTab = ref('headers')
 const filterText = ref('')
 const proxyRunning = ref(false)
 const proxyUrl = ref('')
-const targetUrl = ref('http://localhost:9999')
+const targetUrl = ref('')
 const selectedBrowser = ref('chrome')
 const proxyPort = ref(8888)
 const certDialogVisible = ref(false)
+const settingsVisible = ref(false)
 const certPath = ref('')
+const detailsHeight = ref(400)
+const isResizing = ref(false)
+const viewMode = ref('auto')
+const requestFormat = ref('curl')
+const downloadPath = ref('')
+const filterType = ref('all')
 let refreshInterval: any = null
 
 const filteredEntries = computed(() => {
-  if (!filterText.value) return entries.value
-  const filter = filterText.value.toLowerCase()
-  return entries.value.filter(e => 
-    e.url.toLowerCase().includes(filter) ||
-    e.method.toLowerCase().includes(filter)
-  )
+  let result = entries.value
+  
+  if (filterType.value !== 'all') {
+    result = result.filter(e => {
+      const type = getResourceType(e)
+      if (filterType.value === 'fetch') return type === 'json' || e.type === 'fetch' || e.type === 'xhr'
+      if (filterType.value === 'image') return type === 'image'
+      if (filterType.value === 'document') return type === 'document'
+      return type === filterType.value
+    })
+  }
+  
+  if (filterText.value) {
+    const filter = filterText.value.toLowerCase()
+    result = result.filter(e => 
+      e.url.toLowerCase().includes(filter) ||
+      e.method.toLowerCase().includes(filter)
+    )
+  }
+  
+  return result
+})
+
+const currentViewMode = computed(() => {
+  if (viewMode.value !== 'auto') return viewMode.value
+  
+  const ct = selectedEntry.value?.response?.contentType || ''
+  if (ct.includes('image/')) return 'image'
+  if (ct.includes('application/pdf')) return 'pdf'
+  if (ct.includes('json')) return 'json'
+  if (ct.includes('html')) return 'html'
+  return 'text'
 })
 
 onMounted(async () => {
@@ -264,6 +312,9 @@ async function clearAll() {
 
 async function openBrowser() {
   let url = targetUrl.value
+  if (!url) {
+    url = 'http://localhost:' + (await getTestPort())
+  }
   if (!url.startsWith('http')) url = 'http://' + url
   
   try {
@@ -279,72 +330,141 @@ async function openBrowser() {
   }
 }
 
+async function getTestPort() {
+  try {
+    const { GetTestServerPort } = await import('../../wailsjs/go/main/App')
+    return await GetTestServerPort()
+  } catch {
+    return 9999
+  }
+}
+
+async function selectDownloadPath() {
+  try {
+    const path = await SelectDownloadDirectory()
+    if (path) {
+      downloadPath.value = path
+    }
+  } catch (e) {
+    console.error('Select directory failed:', e)
+  }
+}
+
 function selectEntry(entry: any) {
   selectedEntry.value = entry
 }
 
-function exportData() {
-  const data = { entries: entries.value, exportTime: new Date().toISOString() }
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `network-${Date.now()}.json`
-  a.click()
-}
-
-function getDomain(url: string) {
+async function exportData() {
+  const data = {
+    entries: filteredEntries.value,
+    exportTime: new Date().toISOString(),
+    filter: {
+      type: filterType.value,
+      text: filterText.value
+    },
+    total: filteredEntries.value.length
+  }
+  
   try {
-    const u = new URL(url)
-    return u.hostname
-  } catch {
-    return url
+    await ExportData(JSON.stringify(data, null, 2))
+  } catch (e) {
+    console.error('Export failed:', e)
   }
 }
 
-function getPath(url: string) {
+function handleImageError(e: Event) {
+  console.error('Image load error:', e)
+}
+
+async function saveResponse() {
+  const entry = selectedEntry.value
+  if (!entry?.url) {
+    alert('没有响应内容')
+    return
+  }
+  
   try {
-    const u = new URL(url)
-    let path = u.pathname
-    if (u.search) {
-      path += u.search
+    let filename = 'download.txt'
+    try {
+      const urlPath = new URL(entry.url).pathname
+      filename = urlPath.split('/').pop() || 'download.txt'
+    } catch {
+      filename = 'download.txt'
     }
-    return path || '/'
-  } catch {
-    return url
+    
+    await DownloadResponse(entry.url, filename)
+  } catch (e) {
+    console.error('Download failed:', e)
+    alert('下载失败: ' + e)
   }
 }
 
-function getResourceType(entry: any) {
-  const ct = entry.response?.contentType || ''
-  if (ct.includes('javascript')) return 'js'
-  if (ct.includes('css')) return 'css'
-  if (ct.includes('html')) return 'document'
-  if (ct.includes('json')) return 'json'
-  if (ct.includes('image')) return 'image'
-  if (ct.includes('font')) return 'font'
-  return 'other'
+function openInBrowser() {
+  const entry = selectedEntry.value
+  if (!entry?.url) return
+  BrowserOpenURL(entry.url)
 }
 
-function getStatusClass(status: number) {
-  if (status >= 200 && status < 300) return 'success'
-  if (status >= 300 && status < 400) return 'redirect'
-  if (status >= 400 && status < 500) return 'client-error'
-  return 'server-error'
+async function downloadAndOpen() {
+  await saveResponse()
 }
 
-function formatSize(bytes: number) {
-  if (!bytes) return '-'
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / 1024 / 1024).toFixed(1) + ' MB'
+async function copyUrl() {
+  const entry = selectedEntry.value
+  if (!entry?.url) return
+  
+  try {
+    await navigator.clipboard.writeText(entry.url)
+  } catch (e) {
+    console.error('Copy failed:', e)
+  }
 }
 
-function showCertDialog() {
-  certDialogVisible.value = true
+function generateRequestCode() {
+  const entry = selectedEntry.value
+  if (!entry) return ''
+  
+  if (requestFormat.value === 'curl') {
+    return generateCurl(entry)
+  } else if (requestFormat.value === 'powershell') {
+    return generatePowerShell(entry)
+  } else {
+    return generateFetch(entry)
+  }
+}
+
+async function copyRequest() {
+  const code = generateRequestCode()
+  if (!code) return
+  
+  try {
+    await navigator.clipboard.writeText(code)
+  } catch (e) {
+    console.error('Copy failed:', e)
+  }
+}
+
+function startResize(e: MouseEvent) {
+  isResizing.value = true
+  const startY = e.clientY
+  const startHeight = detailsHeight.value
+  
+  const onMouseMove = (e: MouseEvent) => {
+    if (!isResizing.value) return
+    const delta = startY - e.clientY
+    detailsHeight.value = Math.max(100, Math.min(window.innerHeight - 200, startHeight + delta))
+  }
+  
+  const onMouseUp = () => {
+    isResizing.value = false
+    document.removeEventListener('mousemove', onMouseMove)
+    document.removeEventListener('mouseup', onMouseUp)
+  }
+  
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup', onMouseUp)
 }
 </script>
-
 <style scoped>
 .devtools-network {
   display: flex;
@@ -448,34 +568,9 @@ function showCertDialog() {
   border-color: #1a73e8;
 }
 
-.proxy-label {
-  font-size: 11px;
-  color: #5f6368;
-  white-space: nowrap;
-}
 
-.proxy-port-input {
-  width: 60px;
-  height: 24px;
-  padding: 0 6px;
-  border: 1px solid #dadce0;
-  background: #ffffff;
-  color: #333333;
-  border-radius: 2px;
-  font-size: 11px;
-  text-align: center;
-}
 
-.proxy-port-input:disabled {
-  background: #f8f9fa;
-  color: #80868b;
-}
 
-.proxy-port-input:focus {
-  outline: none;
-  border-color: #1a73e8;
-  box-shadow: 0 0 0 1px #1a73e8;
-}
 
 .divider {
   width: 1px;
@@ -501,22 +596,7 @@ function showCertDialog() {
   box-shadow: 0 0 0 1px #1a73e8;
 }
 
-.url-input {
-  flex: 1;
-  height: 24px;
-  padding: 0 8px;
-  border: 1px solid #dadce0;
-  background: #ffffff;
-  color: #333333;
-  border-radius: 2px;
-  font-size: 11px;
-}
 
-.url-input:focus {
-  outline: none;
-  border-color: #1a73e8;
-  box-shadow: 0 0 0 1px #1a73e8;
-}
 
 .network-table {
   flex: 1;
@@ -642,11 +722,28 @@ function showCertDialog() {
 }
 
 .details-panel {
-  height: 300px;
+  min-height: 200px;
+  max-height: 80vh;
   border-top: 1px solid #e0e0e0;
   display: flex;
   flex-direction: column;
   background: #ffffff;
+  position: relative;
+}
+
+.resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  cursor: ns-resize;
+  background: transparent;
+  z-index: 10;
+}
+
+.resize-handle:hover {
+  background: #1a73e8;
 }
 
 .details-tabs {
@@ -728,158 +825,315 @@ function showCertDialog() {
   color: #333333;
 }
 
+.response-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.response-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.toolbar-left-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.format-label {
+  font-size: 11px;
+  color: #5f6368;
+}
+
+.format-label strong {
+  color: #1a73e8;
+  font-weight: 600;
+}
+
+.view-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #5f6368;
+}
+
+.view-select {
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid #dadce0;
+  background: #ffffff;
+  color: #333333;
+  border-radius: 2px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.view-select:focus {
+  outline: none;
+  border-color: #1a73e8;
+}
+
+.save-btn {
+  padding: 4px 12px;
+  border: 1px solid #dadce0;
+  background: #ffffff;
+  color: #5f6368;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.save-btn:hover {
+  background: #f8f9fa;
+}
+
+.image-preview {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+  background: #f8f9fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.pdf-preview {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  background: #f8f9fa;
+}
+
+.pdf-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.action-btn {
+  padding: 10px 20px;
+  border: 1px solid #1a73e8;
+  background: #1a73e8;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.action-btn:hover {
+  background: #1557b0;
+  border-color: #1557b0;
+}
+
+.pdf-info {
+  text-align: center;
+  color: #5f6368;
+}
+
+.pdf-info p {
+  margin: 8px 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.url-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  max-width: 600px;
+}
+
+.pdf-info code {
+  flex: 1;
+  padding: 12px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #1a73e8;
+  word-break: break-all;
+}
+
+.copy-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #dadce0;
+  background: white;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.copy-btn:hover {
+  background: #f8f9fa;
+  border-color: #1a73e8;
+}
+
+.json-preview,
+.text-preview {
+  flex: 1;
+  margin: 0;
+  padding: 12px;
+  background: #f8f9fa;
+  border: none;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow: auto;
+  color: #333333;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.html-preview {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+}
+
 .empty {
   padding: 40px;
   text-align: center;
   color: #80868b;
 }
 
-.drawer-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-}
-
-.drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 600px;
-  background: white;
-  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+.request-view {
   display: flex;
   flex-direction: column;
-  animation: slideIn 0.3s ease-out;
+  height: 100%;
 }
 
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-
-.drawer-header {
+.request-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #f8f9fa;
   border-bottom: 1px solid #e0e0e0;
+  font-size: 11px;
+}
+
+.format-select {
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid #dadce0;
+  background: #ffffff;
+  color: #333333;
+  border-radius: 2px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.format-select:focus {
+  outline: none;
+  border-color: #1a73e8;
+}
+
+.copy-request-btn {
+  padding: 4px 12px;
+  border: 1px solid #dadce0;
+  background: #ffffff;
+  color: #5f6368;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.copy-request-btn:hover {
   background: #f8f9fa;
 }
 
-.drawer-header h3 {
+.request-code {
+  flex: 1;
   margin: 0;
-  font-size: 16px;
-  color: #333;
+  padding: 12px;
+  background: #f8f9fa;
+  border: none;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow: auto;
+  color: #333333;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  white-space: pre;
+  text-align: left;
 }
 
-.close-icon {
-  width: 32px;
-  height: 32px;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.filter-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.filter-tab {
+  padding: 4px 10px;
   border: none;
   background: transparent;
   color: #5f6368;
   cursor: pointer;
-  font-size: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: background 0.2s;
+  font-size: 11px;
+  border-radius: 2px;
+  transition: all 0.1s;
 }
 
-.close-icon:hover {
+.filter-tab:hover {
   background: #e8eaed;
 }
 
-.drawer-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-  text-align: left;
-}
-
-.drawer-content > p {
-  color: #666;
-  margin-bottom: 16px;
-  line-height: 1.6;
-  text-align: left;
-}
-
-.cert-path {
-  background: #f8f9fa;
-  padding: 12px;
-  border-radius: 4px;
-  margin-bottom: 16px;
-  text-align: left;
-}
-
-.cert-path strong {
-  display: block;
-  margin-bottom: 8px;
-}
-
-.cert-path code {
-  display: block;
-  padding: 8px;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  font-size: 12px;
-  word-break: break-all;
-  text-align: left;
-}
-
-.install-steps {
-  text-align: left;
-}
-
-.install-steps h4 {
-  margin: 24px 0 12px 0;
-  color: #333;
-  font-size: 14px;
+.filter-tab.active {
+  background: #e8f0fe;
+  color: #1a73e8;
   font-weight: 600;
-  text-align: left;
-}
-
-.install-steps ol {
-  margin: 0 0 20px 0;
-  padding-left: 24px;
-  font-size: 13px;
-  line-height: 1.8;
-  color: #333;
-  text-align: left;
-}
-
-.install-steps ol li {
-  margin-bottom: 6px;
-  text-align: left;
-}
-
-.install-steps p {
-  margin: 12px 0 8px 0;
-  color: #666;
-  line-height: 1.6;
-  text-align: left;
-}
-
-.install-steps pre {
-  background: #2d2d30;
-  color: #d4d4d4;
-  padding: 12px;
-  border-radius: 4px;
-  font-size: 11px;
-  overflow-x: auto;
-  margin: 8px 0 16px 0;
-  line-height: 1.5;
-  text-align: left;
 }
 </style>

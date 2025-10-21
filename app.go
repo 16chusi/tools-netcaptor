@@ -343,3 +343,8 @@ func (a *App) CloseBrowser() error {
 	}
 	return nil
 }
+
+// GetTestServerPort 获取测试服务器端口
+func (a *App) GetTestServerPort() int {
+	return GetTestServerPort()
+}
