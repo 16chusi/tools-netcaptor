@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试下载页面</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .download-link { 
+            display: block; 
+            margin: 10px 0; 
+            padding: 10px; 
+            background: #f0f0f0; 
+            text-decoration: none; 
+            border-radius: 5px; 
+        }
+        .pagination { margin: 20px 0; text-align: center; }
+        .next { 
+            padding: 10px 20px; 
+            background: #007cba; 
+            color: white; 
+            text-decoration: none; 
+            border-radius: 5px; 
+        }
+    </style>
+</head>
+<body>
+    <h1>测试下载页面</h1>
+    <p>这是一个用于测试自动下载工具的示例页面。</p>
+    
+    <h2>下载文件</h2>
+    <a href="https://example.com/file1.pdf" class="download-link">📄 文档1.pdf</a>
+    <a href="https://example.com/file2.doc" class="download-link">📄 文档2.doc</a>
+    <a href="https://example.com/software.zip" class="download-link">📦 软件包.zip</a>
+    <a href="https://example.com/data.xlsx" class="download-link">📊 数据表.xlsx</a>
+    
+    <div class="pagination">
+        <a href="test_example_page2.html" class="next">下一页</a>
+    </div>
+    
+    <script>
+        // 模拟一些反爬虫检测
+        console.log('页面加载完成');
+        
+        // 禁用右键菜单（测试反检测功能）
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            alert('右键菜单已被禁用！');
+        });
+        
+        // 禁用F12（测试反检测功能）
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'F12') {
+                e.preventDefault();
+                alert('开发者工具已被禁用！');
+            }
+        });
+    </script>
+</body>
+</html>
