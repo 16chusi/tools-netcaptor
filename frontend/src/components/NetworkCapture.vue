@@ -30,6 +30,7 @@
         <button @click="openBrowser" class="open-btn">打开浏览器</button>
       </div>
       <div class="toolbar-right">
+        <button @click="interceptVisible = true" class="icon-btn" title="拦截">🔧</button>
         <button @click="settingsVisible = true" class="icon-btn" title="设置">⚙️</button>
         <button @click="certDialogVisible = true" class="icon-btn" title="证书">🔒</button>
         <button @click="exportData" class="icon-btn" title="导出">⬇️</button>
@@ -53,6 +54,25 @@
         @close="certDialogVisible = false"
     />
 
+    <InterceptDrawer
+        :visible="interceptVisible"
+        :rules="interceptRules"
+        @close="interceptVisible = false"
+        @toggle="toggleRule"
+        @edit="editRule"
+        @delete="deleteRule"
+        @import="importRules"
+        @export="exportRules"
+        @create="createRule"
+    />
+
+    <InterceptRuleEditor
+        :visible="editorVisible"
+        :initialRule="editingRule"
+        @close="editorVisible = false"
+        @save="saveRule"
+    />
+
     <div class="network-table">
       <div class="table-header">
         <div class="col-name">名称</div>
@@ -61,6 +81,7 @@
         <div class="col-type">类型</div>
         <div class="col-size">大小</div>
         <div class="col-time">时间</div>
+        <div class="col-action">操作</div>
       </div>
       <div class="table-body">
         <div
@@ -83,6 +104,9 @@
           <div class="col-type">{{ getResourceType(entry) }}</div>
           <div class="col-size">{{ formatSize(entry.size) }}</div>
           <div class="col-time">{{ entry.duration ? entry.duration + 'ms' : '-' }}</div>
+          <div class="col-action">
+            <button @click.stop="addInterceptRule(entry)" class="add-rule-btn" title="添加拦截规则">+拦截</button>
+          </div>
         </div>
         <div v-if="filteredEntries.length === 0" class="empty-state">
           <div v-if="!proxyRunning">
@@ -174,10 +198,12 @@ import {
   OpenInEdge,
   OpenInFirefox,
   SelectDownloadDirectory,
+  SetInterceptRules,
   StartProxyWithPort,
   StopProxy
 } from '../../wailsjs/go/main/NetworkApp'
 import {BrowserOpenURL} from '../../wailsjs/runtime/runtime'
+import {ShowErrorDialog, ShowInfoDialog, ShowQuestionDialog} from '../../wailsjs/go/main/NetworkApp'
 import {formatSize, getDomain, getFormatType, getPath, getResourceType, getStatusClass} from '../utils/networkUtils'
 import {generateCurl, generateFetch, generatePowerShell} from '../utils/codeGenerator'
 import {toBase64, toHex} from '../utils/formatters'
@@ -188,8 +214,11 @@ import CookiesTab from './tabs/CookiesTab.vue'
 import PayloadTab from './tabs/PayloadTab.vue'
 import RequestTab from './tabs/RequestTab.vue'
 import ResponseTab from './tabs/ResponseTab.vue'
+import InterceptDrawer from './InterceptDrawer.vue'
+import InterceptRuleEditor from './InterceptRuleEditor.vue'
 import { parseRequestCookies, parseResponseCookies } from '../utils/cookieUtils'
 import { copyJSON, copyToClipboard } from '../utils/clipboardUtils'
+import type { InterceptRule } from '../types/intercept'
 
 
 const entries = ref<any[]>([])
@@ -210,6 +239,10 @@ const viewMode = ref('')
 const requestFormat = ref('curl')
 const downloadPath = ref('')
 const filterType = ref('all')
+const interceptVisible = ref(false)
+const editorVisible = ref(false)
+const interceptRules = ref<InterceptRule[]>([])
+const editingRule = ref<InterceptRule | undefined>(undefined)
 let refreshInterval: any = null
 
 const filteredEntries = computed(() => {
@@ -278,7 +311,7 @@ async function toggleProxy() {
       proxyRunning.value = true
       proxyUrl.value = await GetProxyURL()
     } catch (e: any) {
-      alert(`启动代理失败: ${e}`)
+      ShowErrorDialog('错误', `启动代理失败: ${e}`)
     }
   }
 }
@@ -305,7 +338,7 @@ async function openBrowser() {
       await OpenInFirefox(url)
     }
   } catch (e: any) {
-    alert(`打开浏览器失败: ${e}`)
+    ShowErrorDialog('错误', `打开浏览器失败: ${e}`)
   }
 }
 
@@ -364,7 +397,7 @@ function handleImageError(e: Event) {
 async function saveResponse() {
   const entry = selectedEntry.value
   if (!entry?.url) {
-    alert('没有响应内容')
+    ShowInfoDialog('提示', '没有响应内容')
     return
   }
 
@@ -380,7 +413,7 @@ async function saveResponse() {
     await DownloadResponse(entry.url, filename)
   } catch (e) {
     console.error('Download failed:', e)
-    alert('下载失败: ' + e)
+    ShowErrorDialog('错误', '下载失败: ' + e)
   }
 }
 
@@ -497,6 +530,126 @@ function startResize(e: MouseEvent) {
   document.addEventListener('mousemove', onMouseMove)
   document.addEventListener('mouseup', onMouseUp)
 }
+
+function addInterceptRule(entry: any) {
+  editingRule.value = {
+    id: '',
+    name: `拦截 ${entry.url}`,
+    enabled: true,
+    urlPattern: entry.url,
+    actionType: 'findReplace',
+    findText: '',
+    replaceText: '',
+    useRegex: false,
+    replaceAll: true,
+    webhookEnabled: false
+  }
+  editorVisible.value = true
+}
+
+function createRule() {
+  editingRule.value = undefined
+  editorVisible.value = true
+}
+
+function editRule(rule: InterceptRule) {
+  editingRule.value = { ...rule }
+  editorVisible.value = true
+}
+
+function saveRule(rule: InterceptRule) {
+  const index = interceptRules.value.findIndex(r => r.id === rule.id)
+  if (index >= 0) {
+    interceptRules.value[index] = rule
+  } else {
+    interceptRules.value.push(rule)
+  }
+  editorVisible.value = false
+  saveRulesToStorage()
+}
+
+function toggleRule(id: string) {
+  const rule = interceptRules.value.find(r => r.id === id)
+  if (rule) {
+    rule.enabled = !rule.enabled
+    saveRulesToStorage()
+  }
+}
+
+async function deleteRule(id: string) {
+  const result = await ShowQuestionDialog('确认删除', '确定要删除这条规则吗？')
+  if (result === 'Yes') {
+    interceptRules.value = interceptRules.value.filter(r => r.id !== id)
+    saveRulesToStorage()
+  }
+}
+
+function importRules() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json'
+  input.onchange = (e: any) => {
+    const file = e.target.files[0]
+    if (!file) return
+    
+    const reader = new FileReader()
+    reader.onload = (e: any) => {
+      try {
+        const data = JSON.parse(e.target.result)
+        if (data.rules && Array.isArray(data.rules)) {
+          interceptRules.value = data.rules
+          saveRulesToStorage()
+          ShowInfoDialog('成功', '导入成功')
+        }
+      } catch (err) {
+        ShowErrorDialog('错误', '导入失败: ' + err)
+      }
+    }
+    reader.readAsText(file)
+  }
+  input.click()
+}
+
+function exportRules() {
+  const data = {
+    version: '1.0',
+    rules: interceptRules.value
+  }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `intercept-rules-${Date.now()}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+async function saveRulesToStorage() {
+  localStorage.setItem('interceptRules', JSON.stringify(interceptRules.value))
+  // 同步到后端
+  try {
+    await SetInterceptRules(interceptRules.value)
+  } catch (e) {
+    console.error('Failed to sync rules to backend:', e)
+  }
+}
+
+function loadRulesFromStorage() {
+  const stored = localStorage.getItem('interceptRules')
+  if (stored) {
+    try {
+      interceptRules.value = JSON.parse(stored)
+    } catch (e) {
+      console.error('Failed to load rules:', e)
+    }
+  }
+}
+
+onMounted(async () => {
+  loadRulesFromStorage()
+  // 同步到后端
+  await saveRulesToStorage()
+})
 </script>
 <style scoped>
 .devtools-network {
@@ -699,6 +852,27 @@ function startResize(e: MouseEvent) {
 .col-time {
   width: 80px;
   text-align: right;
+}
+
+.col-action {
+  width: 80px;
+  text-align: center;
+}
+
+.add-rule-btn {
+  padding: 2px 8px;
+  border: 1px solid #1a73e8;
+  background: white;
+  color: #1a73e8;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 10px;
+  transition: all 0.1s;
+}
+
+.add-rule-btn:hover {
+  background: #1a73e8;
+  color: white;
 }
 
 .method {

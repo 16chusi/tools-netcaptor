@@ -14,11 +14,12 @@ import (
 )
 
 type GoProxyServer struct {
-	port       int
-	proxy      *goproxy.ProxyHttpServer
-	capture    *NetworkCapture
-	running    bool
-	requestMap map[string]int64
+	port        int
+	proxy       *goproxy.ProxyHttpServer
+	capture     *NetworkCapture
+	interceptor *Interceptor
+	running     bool
+	requestMap  map[string]int64
 }
 
 func NewGoProxyServer(port int, capture *NetworkCapture) *GoProxyServer {
@@ -26,10 +27,11 @@ func NewGoProxyServer(port int, capture *NetworkCapture) *GoProxyServer {
 	proxy.Verbose = false
 
 	gps := &GoProxyServer{
-		port:       port,
-		proxy:      proxy,
-		capture:    capture,
-		requestMap: make(map[string]int64),
+		port:        port,
+		proxy:       proxy,
+		capture:     capture,
+		interceptor: NewInterceptor(),
+		requestMap:  make(map[string]int64),
 	}
 
 	// 启用HTTPS MITM
@@ -44,6 +46,8 @@ func NewGoProxyServer(port int, capture *NetworkCapture) *GoProxyServer {
 	// 拦截响应
 	proxy.OnResponse().DoFunc(func(resp *http.Response, ctx *goproxy.ProxyCtx) *http.Response {
 		if resp != nil {
+			// Apply intercept rules
+			gps.interceptor.InterceptResponse(resp, ctx.Req)
 			gps.recordResponse(ctx.Req, resp)
 		}
 		return resp

@@ -170,6 +170,43 @@ func (na *NetworkApp) SelectDownloadDirectory() (string, error) {
 	return path, err
 }
 
+// 获取拦截规则
+func (na *NetworkApp) GetInterceptRules() []InterceptRule {
+	return na.proxy.interceptor.GetRules()
+}
+
+// 设置拦截规则
+func (na *NetworkApp) SetInterceptRules(rules []InterceptRule) error {
+	return na.proxy.interceptor.SetRules(rules)
+}
+
+// 显示信息对话框
+func (na *NetworkApp) ShowInfoDialog(title, message string) {
+	runtime.MessageDialog(na.ctx, runtime.MessageDialogOptions{
+		Type:    runtime.InfoDialog,
+		Title:   title,
+		Message: message,
+	})
+}
+
+// 显示错误对话框
+func (na *NetworkApp) ShowErrorDialog(title, message string) {
+	runtime.MessageDialog(na.ctx, runtime.MessageDialogOptions{
+		Type:    runtime.ErrorDialog,
+		Title:   title,
+		Message: message,
+	})
+}
+
+// 显示确认对话框
+func (na *NetworkApp) ShowQuestionDialog(title, message string) (string, error) {
+	return runtime.MessageDialog(na.ctx, runtime.MessageDialogOptions{
+		Type:    runtime.QuestionDialog,
+		Title:   title,
+		Message: message,
+	})
+}
+
 // 导出到文件
 func ExportToFile(ctx context.Context, data string) error {
 	// 弹出保存对话框

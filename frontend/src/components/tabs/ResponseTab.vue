@@ -49,7 +49,20 @@ import { ref, watch, nextTick } from 'vue'
 import { getFormatType } from '../../utils/networkUtils'
 import { toHex, toBase64 } from '../../utils/formatters'
 import hljs from 'highlight.js/lib/core'
+import javascript from 'highlight.js/lib/languages/javascript'
+import json from 'highlight.js/lib/languages/json'
+import xml from 'highlight.js/lib/languages/xml'
+import css from 'highlight.js/lib/languages/css'
+import plaintext from 'highlight.js/lib/languages/plaintext'
+import 'highlight.js/styles/github.css'
 import { css as beautifyCss, html as beautifyHtml, js as beautifyJs } from 'js-beautify'
+
+hljs.registerLanguage('javascript', javascript)
+hljs.registerLanguage('json', json)
+hljs.registerLanguage('xml', xml)
+hljs.registerLanguage('html', xml)
+hljs.registerLanguage('css', css)
+hljs.registerLanguage('plaintext', plaintext)
 
 const props = defineProps<{
   entry: any
