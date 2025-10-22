@@ -111,6 +111,7 @@
         <button :class="['tab', {active: activeTab === 'payload'}]" @click="activeTab = 'payload'">载荷</button>
         <button :class="['tab', {active: activeTab === 'response'}]" @click="activeTab = 'response'">响应</button>
         <button :class="['tab', {active: activeTab === 'request'}]" @click="activeTab = 'request'">请求</button>
+        <button :class="['tab', {active: activeTab === 'cookies'}]" @click="activeTab = 'cookies'">Cookies</button>
       </div>
       <div class="details-content">
         <div v-if="activeTab === 'headers'" class="headers-view">
@@ -168,6 +169,34 @@
             <button @click="copyRequest" class="copy-request-btn">复制</button>
           </div>
           <pre class="request-code">{{ generateRequestCode() }}</pre>
+        </div>
+        <div v-if="activeTab === 'cookies'" class="cookies-view">
+          <div class="section">
+            <div class="section-header">
+              <h4>请求 Cookies</h4>
+              <button @click="copyRequestCookies" class="copy-icon" title="复制">📋</button>
+            </div>
+            <div v-if="getRequestCookies().length > 0" class="cookie-list">
+              <div class="cookie-item" v-for="(cookie, index) in getRequestCookies()" :key="index">
+                <div class="cookie-name">{{ cookie.name }}</div>
+                <div class="cookie-value">{{ cookie.value }}</div>
+              </div>
+            </div>
+            <div v-else class="empty">无 Cookie</div>
+          </div>
+          <div class="section">
+            <div class="section-header">
+              <h4>响应 Cookies</h4>
+              <button @click="copyResponseCookies" class="copy-icon" title="复制">📋</button>
+            </div>
+            <div v-if="getResponseCookies().length > 0" class="cookie-list">
+              <div class="cookie-item" v-for="(cookie, index) in getResponseCookies()" :key="index">
+                <div class="cookie-name">{{ cookie.name }}</div>
+                <div class="cookie-value">{{ cookie.value }}</div>
+              </div>
+            </div>
+            <div v-else class="empty">无 Set-Cookie</div>
+          </div>
         </div>
         <div v-if="activeTab === 'response'" class="response-view">
           <div v-if="selectedEntry.response.body" class="response-container">
@@ -585,6 +614,66 @@ async function copyPayload() {
   }
 }
 
+function getRequestCookies() {
+  const entry = selectedEntry.value
+  if (!entry?.request?.headers) return []
+  
+  const cookieHeader = entry.request.headers['Cookie'] || entry.request.headers['cookie']
+  if (!cookieHeader) return []
+  
+  return cookieHeader.split(';').map((c: string) => {
+    const [name, ...valueParts] = c.trim().split('=')
+    return { name, value: valueParts.join('=') }
+  })
+}
+
+function getResponseCookies() {
+  const entry = selectedEntry.value
+  if (!entry?.response?.headers) return []
+  
+  const setCookieHeader = entry.response.headers['Set-Cookie'] || entry.response.headers['set-cookie']
+  if (!setCookieHeader) return []
+  
+  const cookies = Array.isArray(setCookieHeader) ? setCookieHeader : [setCookieHeader]
+  return cookies.map((c: string) => {
+    const [nameValue] = c.split(';')
+    const [name, ...valueParts] = nameValue.trim().split('=')
+    return { name, value: valueParts.join('=') }
+  })
+}
+
+async function copyRequestCookies() {
+  const cookies = getRequestCookies()
+  if (cookies.length === 0) return
+  
+  const data = cookies.reduce((obj: any, c: any) => {
+    obj[c.name] = c.value
+    return obj
+  }, {})
+  
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(data, null, 2))
+  } catch (e) {
+    console.error('Copy failed:', e)
+  }
+}
+
+async function copyResponseCookies() {
+  const cookies = getResponseCookies()
+  if (cookies.length === 0) return
+  
+  const data = cookies.reduce((obj: any, c: any) => {
+    obj[c.name] = c.value
+    return obj
+  }, {})
+  
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(data, null, 2))
+  } catch (e) {
+    console.error('Copy failed:', e)
+  }
+}
+
 watch([selectedEntry, currentViewMode, activeTab], async () => {
   if (!selectedEntry.value?.response?.body) return
   if (activeTab.value !== 'response') return
@@ -990,6 +1079,37 @@ function startResize(e: MouseEvent) {
 
 .copy-icon:hover {
   background: #e8eaed;
+}
+
+.cookies-view {
+  padding: 12px;
+}
+
+.cookie-list {
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.cookie-item {
+  display: flex;
+  padding: 2px 0;
+  line-height: 1.6;
+  gap: 8px;
+}
+
+.cookie-name {
+  color: #881280;
+  min-width: 180px;
+  flex-shrink: 0;
+  text-align: right;
+  padding-right: 4px;
+}
+
+.cookie-value {
+  flex: 1;
+  color: #1a1aa6;
+  word-break: break-all;
+  text-align: left;
 }
 
 .kv-list {
