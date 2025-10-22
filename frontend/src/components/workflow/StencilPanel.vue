@@ -31,11 +31,45 @@ function initStencil() {
     stencilGraphWidth: 200,
     stencilGraphHeight: 800,
     getDragNode: (node) => node.clone(),
-    getDropNode: (node) => node.clone(),
+    getDropNode: (node) => {
+      const cloned = node.clone()
+      const config = NODE_CONFIGS.find(c => c.type === node.getData()?.type)
+      if (config) {
+        // 添加连接点
+        cloned.addPort({ group: 'top' })
+        cloned.addPort({ group: 'bottom' })
+        cloned.setProp('ports', {
+          groups: {
+            top: { position: 'top', attrs: { circle: { r: 8, magnet: true, stroke: '#fff', fill: config.color, strokeWidth: 2 } } },
+            bottom: { position: 'bottom', attrs: { circle: { r: 8, magnet: true, stroke: '#fff', fill: config.color, strokeWidth: 2 } } }
+          }
+        })
+        // 添加删除按钮
+        cloned.addTools([
+          {
+            name: 'button-remove',
+            args: {
+              x: '100%',
+              y: 0,
+              offset: { x: -10, y: 10 },
+            },
+          },
+        ])
+      }
+      return cloned
+    },
+    layoutOptions: {
+      columns: 1,
+      columnWidth: 180,
+      rowHeight: 60,
+      dx: 10,
+      dy: 10
+    },
     groups: [
       {
         name: 'basic',
-        title: '基础组件'
+        title: '基础组件',
+        collapsable: false
       }
     ]
   })
@@ -45,29 +79,41 @@ function initStencil() {
   // 创建节点
   const nodes = NODE_CONFIGS.filter(c => c.type !== 'start' && c.type !== 'end').map(config => {
     return props.graph!.createNode({
-      width: 120,
-      height: 40,
+      width: 160,
+      height: 50,
       shape: 'rect',
-      label: config.label,
+      markup: [
+        { tagName: 'rect', selector: 'body' },
+        { tagName: 'text', selector: 'icon' },
+        { tagName: 'text', selector: 'label' }
+      ],
       attrs: {
         body: {
           fill: config.color,
           stroke: config.color,
-          rx: 6,
-          ry: 6
+          strokeWidth: 2,
+          rx: 8,
+          ry: 8
+        },
+        icon: {
+          text: config.icon,
+          fill: '#333',
+          fontSize: 20,
+          refX: 20,
+          refY: 25,
+          textAnchor: 'middle',
+          textVerticalAnchor: 'middle'
         },
         label: {
           text: config.label,
-          fill: '#fff',
-          fontSize: 12
+          fill: '#333',
+          fontSize: 13,
+          fontWeight: 500,
+          refX: 50,
+          refY: 25,
+          textAnchor: 'start',
+          textVerticalAnchor: 'middle'
         }
-      },
-      ports: {
-        groups: {
-          top: { position: 'top', attrs: { circle: { r: 4, magnet: true, stroke: '#fff', fill: config.color } } },
-          bottom: { position: 'bottom', attrs: { circle: { r: 4, magnet: true, stroke: '#fff', fill: config.color } } }
-        },
-        items: [{ group: 'top' }, { group: 'bottom' }]
       },
       data: { type: config.type }
     })
@@ -113,5 +159,13 @@ defineExpose({
   padding: 8px 16px;
   font-size: 12px;
   font-weight: 500;
+}
+
+.stencil-panel :deep(.x6-graph) {
+  background: white;
+}
+
+.stencil-panel :deep(.x6-graph-svg) {
+  background: white;
 }
 </style>

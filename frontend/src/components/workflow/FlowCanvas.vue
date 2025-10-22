@@ -3,7 +3,7 @@
     <div class="canvas-toolbar">
       <button @click="$emit('save')" class="toolbar-btn">💾 保存</button>
       <button @click="$emit('run')" class="toolbar-btn primary">▶️ 运行</button>
-      <button @click="$emit('clear')" class="toolbar-btn">🗑️ 清空</button>
+      <button @click="$emit('clear')" class="toolbar-btn">🧹 清空</button>
     </div>
     <div ref="containerRef" class="canvas-container"></div>
   </div>
@@ -13,6 +13,8 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { Graph } from '@antv/x6'
 import { Dnd } from '@antv/x6-plugin-dnd'
+import { Selection } from '@antv/x6-plugin-selection'
+import { Keyboard } from '@antv/x6-plugin-keyboard'
 import type { WorkflowTask } from '../../types/workflow'
 
 const props = defineProps<{
@@ -31,6 +33,7 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLDivElement>()
 let graph: Graph | null = null
 let dnd: Dnd | null = null
+const hasSelection = ref(false)
 
 onMounted(() => {
   console.log('[FlowCanvas] 组件已挂载')
@@ -108,7 +111,13 @@ function initGraph() {
     emitChange()
   })
 
-  graph.on('edge:connected', () => {
+  graph.on('edge:connected', ({ edge }) => {
+    edge.addTools([
+      {
+        name: 'button-remove',
+        args: { distance: '50%' },
+      },
+    ])
     emitChange()
   })
 
@@ -121,6 +130,17 @@ function initGraph() {
       data: node.getData()
     }
     emit('selectNode', nodeData)
+  })
+
+  // 右键菜单
+  graph.on('node:contextmenu', ({ node, e }) => {
+    e.preventDefault()
+    showContextMenu(node, e.clientX, e.clientY)
+  })
+
+  graph.on('edge:contextmenu', ({ edge, e }) => {
+    e.preventDefault()
+    showContextMenu(edge, e.clientX, e.clientY)
   })
   
   // 初始化 Dnd
@@ -172,7 +192,7 @@ function addNode(type: string, label: string, x: number, y: number, color: strin
 
   console.log('[FlowCanvas] 添加节点:', label, x, y)
 
-  const node = graph.addNode({
+  const nodeConfig: any = {
     x,
     y,
     width: 120,
@@ -193,13 +213,29 @@ function addNode(type: string, label: string, x: number, y: number, color: strin
     },
     ports: {
       groups: {
-        top: { position: 'top', attrs: { circle: { r: 4, magnet: true, stroke: '#fff', fill: color } } },
-        bottom: { position: 'bottom', attrs: { circle: { r: 4, magnet: true, stroke: '#fff', fill: color } } }
+        top: { position: 'top', attrs: { circle: { r: 8, magnet: true, stroke: '#fff', strokeWidth: 2, fill: color } } },
+        bottom: { position: 'bottom', attrs: { circle: { r: 8, magnet: true, stroke: '#fff', strokeWidth: 2, fill: color } } }
       },
       items: [{ group: 'top' }, { group: 'bottom' }]
     },
     data: { type }
-  })
+  }
+
+  // 只有非开始/结束节点才添加删除按钮
+  if (type !== 'start' && type !== 'end') {
+    nodeConfig.tools = [
+      {
+        name: 'button-remove',
+        args: {
+          x: '100%',
+          y: 0,
+          offset: { x: -10, y: 10 },
+        },
+      },
+    ]
+  }
+
+  const node = graph.addNode(nodeConfig)
   
   console.log('[FlowCanvas] 节点已添加:', node.id)
   return node
@@ -210,11 +246,49 @@ function createDefaultNodes() {
 
   console.log('[FlowCanvas] 创建默认节点')
 
-  // 开始节点
-  addNode('start', '开始', 300, 50, '#52c41a')
+  // 开始节点 - 只有下方连接点
+  if (graph) {
+    graph.addNode({
+      x: 300,
+      y: 50,
+      width: 120,
+      height: 40,
+      shape: 'rect',
+      attrs: {
+        body: { fill: '#52c41a', stroke: '#52c41a', rx: 6, ry: 6 },
+        label: { text: '开始', fill: '#fff', fontSize: 12 }
+      },
+      ports: {
+        groups: {
+          bottom: { position: 'bottom', attrs: { circle: { r: 8, magnet: true, stroke: '#fff', strokeWidth: 2, fill: '#52c41a' } } }
+        },
+        items: [{ group: 'bottom' }]
+      },
+      data: { type: 'start' }
+    })
+  }
 
-  // 结束节点
-  addNode('end', '结束', 300, 400, '#f5222d')
+  // 结束节点 - 只有上方连接点
+  if (graph) {
+    graph.addNode({
+      x: 300,
+      y: 400,
+      width: 120,
+      height: 40,
+      shape: 'rect',
+      attrs: {
+        body: { fill: '#f5222d', stroke: '#f5222d', rx: 6, ry: 6 },
+        label: { text: '结束', fill: '#fff', fontSize: 12 }
+      },
+      ports: {
+        groups: {
+          top: { position: 'top', attrs: { circle: { r: 8, magnet: true, stroke: '#fff', strokeWidth: 2, fill: '#f5222d' } } }
+        },
+        items: [{ group: 'top' }]
+      },
+      data: { type: 'end' }
+    })
+  }
   
   console.log('[FlowCanvas] 节点数量:', graph.getNodes().length)
 }
@@ -228,6 +302,37 @@ function loadTask(task: WorkflowTask) {
     const config = { type: node.type, label: node.label, color: '#1890ff' }
     addNode(config.type, config.label, node.x, node.y, config.color)
   })
+}
+
+function showContextMenu(cell: any, clientX: number, clientY: number) {
+  const menu = document.createElement('div')
+  menu.className = 'context-menu'
+  menu.style.left = `${clientX}px`
+  menu.style.top = `${clientY}px`
+  menu.innerHTML = `
+    <div class="menu-item" data-action="delete">🗑️ 删除</div>
+  `
+  
+  menu.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement
+    if (target.dataset.action === 'delete') {
+      graph?.removeCell(cell)
+    }
+    document.body.removeChild(menu)
+  })
+  
+  document.body.appendChild(menu)
+  
+  const closeMenu = () => {
+    if (document.body.contains(menu)) {
+      document.body.removeChild(menu)
+    }
+    document.removeEventListener('click', closeMenu)
+  }
+  
+  setTimeout(() => {
+    document.addEventListener('click', closeMenu)
+  }, 100)
 }
 
 function emitChange() {
@@ -305,5 +410,26 @@ function emitChange() {
   min-height: 0;
   width: 100%;
   height: 100%;
+}
+
+:deep(.context-menu) {
+  position: fixed;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  min-width: 120px;
+}
+
+:deep(.menu-item) {
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+
+:deep(.menu-item:hover) {
+  background: #f5f5f5;
 }
 </style>

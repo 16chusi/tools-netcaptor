@@ -11,6 +11,8 @@
   "dependencies": {
     "@antv/x6": "^2.18.1",
     "@antv/x6-plugin-dnd": "^2.1.1",
+    "@antv/x6-plugin-keyboard": "^2.2.3",
+    "@antv/x6-plugin-selection": "^2.2.2",
     "@antv/x6-plugin-stencil": "^2.1.5",
     "@antv/x6-vue-shape": "^2.1.2",
     "highlight.js": "^11.11.1",
