@@ -194,7 +194,7 @@
               </div>
             </div>
             <pre v-else-if="currentViewMode === 'json'" class="json-preview">{{ formatJSON(selectedEntry.response.body) }}</pre>
-            <div v-else-if="currentViewMode === 'html'" class="html-preview" v-html="selectedEntry.response.body"></div>
+            <iframe v-else-if="currentViewMode === 'html'" class="html-preview" :srcdoc="selectedEntry.response.body"></iframe>
             <pre v-else-if="currentViewMode === 'hex'" class="text-preview">{{ toHex(selectedEntry.response.body) }}</pre>
             <pre v-else-if="currentViewMode === 'base64'" class="text-preview">{{ toBase64(selectedEntry.response.body) }}</pre>
             <pre v-else class="text-preview">{{ selectedEntry.response.body }}</pre>
@@ -1010,10 +1010,9 @@ function startResize(e: MouseEvent) {
 
 .html-preview {
   flex: 1;
-  overflow: auto;
-  padding: 12px;
+  width: 100%;
+  border: none;
   background: #ffffff;
-  border: 1px solid #e0e0e0;
 }
 
 .empty {
