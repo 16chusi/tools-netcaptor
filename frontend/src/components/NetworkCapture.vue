@@ -149,7 +149,12 @@
           </div>
         </div>
         <div v-if="activeTab === 'payload'" class="payload-view">
-          <pre v-if="selectedEntry.request.body">{{ selectedEntry.request.body }}</pre>
+          <div v-if="selectedEntry.request.body" class="payload-container">
+            <div class="payload-toolbar">
+              <button @click="copyPayload" class="copy-payload-btn">复制</button>
+            </div>
+            <pre ref="payloadBlock" class="payload-preview"><code></code></pre>
+          </div>
           <div v-else class="empty">无请求体</div>
         </div>
         <div v-if="activeTab === 'request'" class="request-view">
@@ -532,6 +537,53 @@ async function copyResponseHeaders() {
 }
 
 const codeBlock = ref<HTMLElement | null>(null)
+const payloadBlock = ref<HTMLElement | null>(null)
+
+watch([selectedEntry, activeTab], async () => {
+  if (!selectedEntry.value?.request?.body) return
+  if (activeTab.value !== 'payload') return
+  
+  await nextTick()
+  if (!payloadBlock.value) return
+  
+  const codeEl = payloadBlock.value.querySelector('code')
+  if (!codeEl) return
+  
+  let decoded = decodeHtml(selectedEntry.value.request.body)
+  const ct = selectedEntry.value.request?.headers?.['Content-Type'] || selectedEntry.value.request?.headers?.['content-type'] || ''
+  
+  let lang = 'plaintext'
+  let isText = true
+  
+  if (ct.includes('json')) {
+    lang = 'json'
+    try { decoded = JSON.stringify(JSON.parse(decoded), null, 2) } catch {}
+  } else if (ct.includes('text/')) {
+    lang = 'plaintext'
+  } else if (ct.includes('x-www-form-urlencoded')) {
+    lang = 'plaintext'
+  } else {
+    isText = false
+    decoded = toHex(decoded)
+  }
+  
+  payloadContent.value = decoded
+  codeEl.textContent = decoded
+  if (isText) {
+    codeEl.className = `language-${lang}`
+    delete (codeEl as any).dataset.highlighted
+    hljs.highlightElement(codeEl as HTMLElement)
+  }
+}, { flush: 'post' })
+
+async function copyPayload() {
+  if (!payloadContent.value) return
+  try {
+    await navigator.clipboard.writeText(payloadContent.value)
+  } catch (e) {
+    console.error('Copy failed:', e)
+  }
+}
 
 watch([selectedEntry, currentViewMode, activeTab], async () => {
   if (!selectedEntry.value?.response?.body) return
@@ -569,34 +621,9 @@ watch([selectedEntry, currentViewMode, activeTab], async () => {
   codeEl.className = `language-${lang}`
   delete (codeEl as any).dataset.highlighted
   hljs.highlightElement(codeEl as HTMLElement)
-  addLineNumbers(codeEl as HTMLElement)
 })
 
-function addLineNumbers(codeEl: HTMLElement) {
-  const lines = codeEl.textContent?.split('\n') || []
-  const lineCount = lines.length
-  
-  const wrapper = document.createElement('div')
-  wrapper.className = 'code-with-lines'
-  
-  const lineNumbers = document.createElement('div')
-  lineNumbers.className = 'line-numbers'
-  for (let i = 1; i <= lineCount; i++) {
-    const lineNum = document.createElement('div')
-    lineNum.textContent = i.toString()
-    lineNumbers.appendChild(lineNum)
-  }
-  
-  const codeWrapper = document.createElement('div')
-  codeWrapper.className = 'code-content'
-  codeWrapper.innerHTML = codeEl.innerHTML
-  
-  wrapper.appendChild(lineNumbers)
-  wrapper.appendChild(codeWrapper)
-  
-  codeEl.innerHTML = ''
-  codeEl.appendChild(wrapper)
-}
+const payloadContent = ref('')
 
 function startResize(e: MouseEvent) {
   isResizing.value = true
@@ -992,7 +1019,62 @@ function startResize(e: MouseEvent) {
   flex: 1;
 }
 
-.payload-view pre,
+.payload-view {
+  height: 100%;
+}
+
+.payload-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.payload-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.copy-payload-btn {
+  padding: 4px 12px;
+  border: 1px solid #dadce0;
+  background: #ffffff;
+  color: #5f6368;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.copy-payload-btn:hover {
+  background: #f8f9fa;
+}
+
+.payload-preview {
+  flex: 1;
+  margin: 0;
+  padding: 12px;
+  background: #f8f9fa;
+  border: none;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow: auto;
+  color: #333333;
+  font-family: 'Consolas', 'Monaco', monospace;
+  text-align: left;
+}
+
+.payload-preview code {
+  display: block;
+  white-space: pre;
+  word-wrap: normal;
+  overflow-x: auto;
+  text-align: left;
+}
+
+
+
 .response-view pre {
   margin: 0;
   padding: 12px;
@@ -1197,29 +1279,7 @@ function startResize(e: MouseEvent) {
   text-align: left;
 }
 
-.text-preview :deep(.code-with-lines) {
-  display: flex;
-  width: 100%;
-}
 
-.text-preview :deep(.line-numbers) {
-  text-align: right;
-  color: #999;
-  border-right: 1px solid #ddd;
-  padding-right: 8px;
-  margin-right: 12px;
-  user-select: none;
-  min-width: 40px;
-  line-height: 1.6;
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 12px;
-}
-
-.text-preview :deep(.code-content) {
-  flex: 1;
-  overflow-x: auto;
-  line-height: 1.6;
-}
 
 
 
