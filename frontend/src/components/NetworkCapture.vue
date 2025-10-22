@@ -162,11 +162,12 @@
                 <span class="format-label">格式: <strong>{{ getFormatType(selectedEntry.response?.contentType || '') }}</strong></span>
                 <div class="view-mode">
                   <label>查看方式:</label>
-                  <select v-model="viewMode" class="view-select">
-                    <option value="auto">自动</option>
+                  <select :value="currentViewMode" @change="handleViewModeChange" class="view-select">
                     <option value="text">文本</option>
                     <option value="json">JSON</option>
                     <option value="html">HTML</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="css">CSS</option>
                     <option value="image">图片</option>
                     <option value="pdf">PDF</option>
                     <option value="hex">十六进制</option>
@@ -193,11 +194,9 @@
                 </div>
               </div>
             </div>
-            <pre v-else-if="currentViewMode === 'json'" class="json-preview">{{ formatJSON(selectedEntry.response.body) }}</pre>
-            <iframe v-else-if="currentViewMode === 'html'" class="html-preview" :srcdoc="selectedEntry.response.body"></iframe>
-            <pre v-else-if="currentViewMode === 'hex'" class="text-preview">{{ toHex(selectedEntry.response.body) }}</pre>
-            <pre v-else-if="currentViewMode === 'base64'" class="text-preview">{{ toBase64(selectedEntry.response.body) }}</pre>
-            <pre v-else class="text-preview">{{ selectedEntry.response.body }}</pre>
+            <pre v-else-if="currentViewMode === 'hex'" class="text-preview">{{ getHexContent() }}</pre>
+            <pre v-else-if="currentViewMode === 'base64'" class="text-preview">{{ getBase64Content() }}</pre>
+            <pre v-else ref="codeBlock" class="text-preview"><code></code></pre>
           </div>
           <div v-else class="empty">无响应体</div>
         </div>
@@ -207,7 +206,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { GetAllEntries, ClearCapture, StartProxyWithPort, StopProxy, IsProxyRunning, GetProxyURL, GetCACertPath, OpenInChrome, OpenInEdge, OpenInFirefox, DownloadResponse, ExportData, SelectDownloadDirectory } from '../../wailsjs/go/main/NetworkApp'
 import { BrowserOpenURL } from '../../wailsjs/runtime/runtime'
 import { getDomain, getPath, getResourceType, getStatusClass, formatSize, getFormatType } from '../utils/networkUtils'
@@ -215,6 +214,21 @@ import { generateCurl, generatePowerShell, generateFetch } from '../utils/codeGe
 import { formatJSON, toHex, toBase64 } from '../utils/formatters'
 import SettingsDrawer from './SettingsDrawer.vue'
 import CertDrawer from './CertDrawer.vue'
+import hljs from 'highlight.js/lib/core'
+import javascript from 'highlight.js/lib/languages/javascript'
+import json from 'highlight.js/lib/languages/json'
+import xml from 'highlight.js/lib/languages/xml'
+import css from 'highlight.js/lib/languages/css'
+import plaintext from 'highlight.js/lib/languages/plaintext'
+import 'highlight.js/styles/github.css'
+import { html as beautifyHtml, css as beautifyCss, js as beautifyJs } from 'js-beautify'
+
+hljs.registerLanguage('javascript', javascript)
+hljs.registerLanguage('json', json)
+hljs.registerLanguage('xml', xml)
+hljs.registerLanguage('html', xml)
+hljs.registerLanguage('css', css)
+hljs.registerLanguage('plaintext', plaintext)
 
 const entries = ref<any[]>([])
 const selectedEntry = ref<any>(null)
@@ -230,7 +244,7 @@ const settingsVisible = ref(false)
 const certPath = ref('')
 const detailsHeight = ref(400)
 const isResizing = ref(false)
-const viewMode = ref('auto')
+const viewMode = ref('')
 const requestFormat = ref('curl')
 const downloadPath = ref('')
 const filterType = ref('all')
@@ -261,14 +275,17 @@ const filteredEntries = computed(() => {
 })
 
 const currentViewMode = computed(() => {
-  if (viewMode.value !== 'auto') return viewMode.value
+  if (viewMode.value) return viewMode.value
   
   const ct = selectedEntry.value?.response?.contentType || ''
   if (ct.includes('image/')) return 'image'
   if (ct.includes('application/pdf')) return 'pdf'
   if (ct.includes('json')) return 'json'
+  if (ct.includes('javascript')) return 'javascript'
   if (ct.includes('html')) return 'html'
-  return 'text'
+  if (ct.includes('css')) return 'css'
+  if (ct.includes('text/')) return 'text'
+  return 'hex'
 })
 
 onMounted(async () => {
@@ -352,6 +369,12 @@ async function selectDownloadPath() {
 
 function selectEntry(entry: any) {
   selectedEntry.value = entry
+  viewMode.value = ''
+}
+
+function handleViewModeChange(e: Event) {
+  const newMode = (e.target as HTMLSelectElement).value
+  viewMode.value = newMode
 }
 
 async function exportData() {
@@ -442,6 +465,89 @@ async function copyRequest() {
   } catch (e) {
     console.error('Copy failed:', e)
   }
+}
+
+function decodeHtml(html: string): string {
+  const txt = document.createElement('textarea')
+  txt.innerHTML = html
+  return txt.value
+}
+
+function getHexContent(): string {
+  if (!selectedEntry.value?.response?.body) return ''
+  return toHex(decodeHtml(selectedEntry.value.response.body))
+}
+
+function getBase64Content(): string {
+  if (!selectedEntry.value?.response?.body) return ''
+  return toBase64(decodeHtml(selectedEntry.value.response.body))
+}
+
+const codeBlock = ref<HTMLElement | null>(null)
+
+watch([selectedEntry, currentViewMode, activeTab], async () => {
+  if (!selectedEntry.value?.response?.body) return
+  if (activeTab.value !== 'response') return
+  if (currentViewMode.value === 'hex' || currentViewMode.value === 'base64' || currentViewMode.value === 'image' || currentViewMode.value === 'pdf') return
+  
+  await nextTick()
+  if (!codeBlock.value) return
+  
+  const codeEl = codeBlock.value.querySelector('code')
+  if (!codeEl) return
+  
+  let decoded = decodeHtml(selectedEntry.value.response.body)
+  const mode = currentViewMode.value
+  
+  let lang = 'plaintext'
+  
+  if (mode === 'json') {
+    lang = 'json'
+    try { decoded = JSON.stringify(JSON.parse(decoded), null, 2) } catch {}
+  } else if (mode === 'javascript') {
+    lang = 'javascript'
+    decoded = beautifyJs(decoded, { indent_size: 2 })
+  } else if (mode === 'html') {
+    lang = 'html'
+    decoded = beautifyHtml(decoded, { indent_size: 2 })
+  } else if (mode === 'css') {
+    lang = 'css'
+    decoded = beautifyCss(decoded, { indent_size: 2 })
+  } else if (mode === 'text') {
+    lang = 'plaintext'
+  }
+  
+  codeEl.textContent = decoded
+  codeEl.className = `language-${lang}`
+  delete (codeEl as any).dataset.highlighted
+  hljs.highlightElement(codeEl as HTMLElement)
+  addLineNumbers(codeEl as HTMLElement)
+})
+
+function addLineNumbers(codeEl: HTMLElement) {
+  const lines = codeEl.textContent?.split('\n') || []
+  const lineCount = lines.length
+  
+  const wrapper = document.createElement('div')
+  wrapper.className = 'code-with-lines'
+  
+  const lineNumbers = document.createElement('div')
+  lineNumbers.className = 'line-numbers'
+  for (let i = 1; i <= lineCount; i++) {
+    const lineNum = document.createElement('div')
+    lineNum.textContent = i.toString()
+    lineNumbers.appendChild(lineNum)
+  }
+  
+  const codeWrapper = document.createElement('div')
+  codeWrapper.className = 'code-content'
+  codeWrapper.innerHTML = codeEl.innerHTML
+  
+  wrapper.appendChild(lineNumbers)
+  wrapper.appendChild(codeWrapper)
+  
+  codeEl.innerHTML = ''
+  codeEl.appendChild(wrapper)
 }
 
 function startResize(e: MouseEvent) {
@@ -1001,19 +1107,47 @@ function startResize(e: MouseEvent) {
   padding: 12px;
   background: #f8f9fa;
   border: none;
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 1.6;
   overflow: auto;
   color: #333333;
   font-family: 'Consolas', 'Monaco', monospace;
+  text-align: left;
 }
 
-.html-preview {
-  flex: 1;
-  width: 100%;
-  border: none;
-  background: #ffffff;
+.text-preview code {
+  display: block;
+  white-space: pre;
+  word-wrap: normal;
+  overflow-x: auto;
+  text-align: left;
 }
+
+.text-preview :deep(.code-with-lines) {
+  display: flex;
+  width: 100%;
+}
+
+.text-preview :deep(.line-numbers) {
+  text-align: right;
+  color: #999;
+  border-right: 1px solid #ddd;
+  padding-right: 8px;
+  margin-right: 12px;
+  user-select: none;
+  min-width: 40px;
+  line-height: 1.6;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 12px;
+}
+
+.text-preview :deep(.code-content) {
+  flex: 1;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+
+
 
 .empty {
   padding: 40px;
