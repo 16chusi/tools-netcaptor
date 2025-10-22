@@ -30,12 +30,18 @@
         <button @click="openBrowser" class="open-btn">打开浏览器</button>
       </div>
       <div class="toolbar-right">
+        <button @click="workflowVisible = true" class="icon-btn" title="任务流">🔄</button>
         <button @click="interceptVisible = true" class="icon-btn" title="拦截">🔧</button>
         <button @click="settingsVisible = true" class="icon-btn" title="设置">⚙️</button>
         <button @click="certDialogVisible = true" class="icon-btn" title="证书">🔒</button>
         <button @click="exportData" class="icon-btn" title="导出">⬇️</button>
       </div>
     </div>
+
+    <WorkflowDrawer
+        :visible="workflowVisible"
+        @close="workflowVisible = false"
+    />
 
     <SettingsDrawer
         :visible="settingsVisible"
@@ -44,8 +50,12 @@
         v-model:targetUrl="targetUrl"
         :downloadPath="downloadPath"
         :proxyRunning="proxyRunning"
+        :wsPort="wsPort"
+        :wsRunning="wsRunning"
         @close="settingsVisible = false"
         @selectPath="selectDownloadPath"
+        @startWebSocket="startWebSocket"
+        @stopWebSocket="stopWebSocket"
     />
 
     <CertDrawer
@@ -193,14 +203,18 @@ import {
   GetAllEntries,
   GetCACertPath,
   GetProxyURL,
+  GetWebSocketPort,
   IsProxyRunning,
+  IsWebSocketRunning,
   OpenInChrome,
   OpenInEdge,
   OpenInFirefox,
   SelectDownloadDirectory,
   SetInterceptRules,
   StartProxyWithPort,
-  StopProxy
+  StartWebSocketServer,
+  StopProxy,
+  StopWebSocketServer
 } from '../../wailsjs/go/main/NetworkApp'
 import {BrowserOpenURL} from '../../wailsjs/runtime/runtime'
 import {ShowErrorDialog, ShowInfoDialog, ShowQuestionDialog} from '../../wailsjs/go/main/NetworkApp'
@@ -216,6 +230,7 @@ import RequestTab from './tabs/RequestTab.vue'
 import ResponseTab from './tabs/ResponseTab.vue'
 import InterceptDrawer from './InterceptDrawer.vue'
 import InterceptRuleEditor from './InterceptRuleEditor.vue'
+import WorkflowDrawer from './WorkflowDrawer.vue'
 import { parseRequestCookies, parseResponseCookies } from '../utils/cookieUtils'
 import { copyJSON, copyToClipboard } from '../utils/clipboardUtils'
 import type { InterceptRule } from '../types/intercept'
@@ -243,6 +258,9 @@ const interceptVisible = ref(false)
 const editorVisible = ref(false)
 const interceptRules = ref<InterceptRule[]>([])
 const editingRule = ref<InterceptRule | undefined>(undefined)
+const wsPort = ref<number>()
+const wsRunning = ref(false)
+const workflowVisible = ref(false)
 let refreshInterval: any = null
 
 const filteredEntries = computed(() => {
@@ -289,6 +307,17 @@ onMounted(async () => {
     proxyUrl.value = await GetProxyURL()
   }
   certPath.value = await GetCACertPath()
+  
+  // 获取 WebSocket 状态
+  try {
+    wsRunning.value = await IsWebSocketRunning()
+    if (wsRunning.value) {
+      wsPort.value = await GetWebSocketPort()
+    }
+  } catch (e) {
+    console.error('Failed to get WebSocket status:', e)
+  }
+  
   refreshInterval = setInterval(refreshData, 500)
 })
 
@@ -642,6 +671,28 @@ function loadRulesFromStorage() {
     } catch (e) {
       console.error('Failed to load rules:', e)
     }
+  }
+}
+
+async function startWebSocket() {
+  try {
+    await StartWebSocketServer()
+    wsRunning.value = true
+    wsPort.value = await GetWebSocketPort()
+    ShowInfoDialog('成功', `WebSocket 服务器已启动，端口: ${wsPort.value}`)
+  } catch (e: any) {
+    ShowErrorDialog('错误', `启动失败: ${e}`)
+  }
+}
+
+async function stopWebSocket() {
+  try {
+    await StopWebSocketServer()
+    wsRunning.value = false
+    wsPort.value = undefined
+    ShowInfoDialog('成功', 'WebSocket 服务器已停止')
+  } catch (e: any) {
+    ShowErrorDialog('错误', `停止失败: ${e}`)
   }
 }
 

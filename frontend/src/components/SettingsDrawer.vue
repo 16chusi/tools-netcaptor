@@ -7,6 +7,18 @@
       </div>
       <div class="drawer-content">
         <div class="setting-item">
+          <label>WebSocket 服务</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <div class="info-box" style="flex: 1;">
+              <span class="port-value">{{ wsRunning ? wsPort : '未启动' }}</span>
+            </div>
+            <button v-if="!wsRunning" @click="$emit('startWebSocket')" class="ws-btn ws-btn-start">启动</button>
+            <button v-else @click="$emit('stopWebSocket')" class="ws-btn ws-btn-stop">停止</button>
+          </div>
+          <small>浏览器插件连接端口（随机分配 10000-19999）</small>
+        </div>
+        
+        <div class="setting-item">
           <label>代理端口</label>
           <input 
             :value="proxyPort" 
@@ -56,6 +68,8 @@ defineProps<{
   selectedBrowser: string
   targetUrl: string
   downloadPath: string
+  wsPort?: number
+  wsRunning?: boolean
 }>()
 
 defineEmits<{
@@ -64,6 +78,8 @@ defineEmits<{
   'update:selectedBrowser': [value: string]
   'update:targetUrl': [value: string]
   selectPath: []
+  startWebSocket: []
+  stopWebSocket: []
 }>()
 </script>
 
@@ -205,5 +221,47 @@ defineEmits<{
 .browse-btn:hover {
   background: #f8f9fa;
   border-color: #1a73e8;
+}
+
+.info-box {
+  padding: 10px 12px;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+}
+
+.port-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a73e8;
+  font-family: 'Courier New', monospace;
+}
+
+.ws-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.ws-btn-start {
+  background: #1a73e8;
+  color: white;
+}
+
+.ws-btn-start:hover {
+  background: #1557b0;
+}
+
+.ws-btn-stop {
+  background: #d93025;
+  color: white;
+}
+
+.ws-btn-stop:hover {
+  background: #b71c1c;
 }
 </style>

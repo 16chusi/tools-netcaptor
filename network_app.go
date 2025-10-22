@@ -8,19 +8,22 @@ import (
 )
 
 type NetworkApp struct {
-	ctx     context.Context
-	capture *NetworkCapture
-	proxy   *GoProxyServer
-	webview *WebViewCapture
+	ctx      context.Context
+	capture  *NetworkCapture
+	proxy    *GoProxyServer
+	webview  *WebViewCapture
+	wsServer *WebSocketServer
 }
 
 func NewNetworkApp() *NetworkApp {
 	capture := NewNetworkCapture()
-	return &NetworkApp{
+	app := &NetworkApp{
 		capture: capture,
 		proxy:   NewGoProxyServer(8888, capture),
 		webview: NewWebViewCapture(capture),
 	}
+	app.wsServer = NewWebSocketServer(app)
+	return app
 }
 
 func (na *NetworkApp) startup(ctx context.Context) {
@@ -204,6 +207,34 @@ func (na *NetworkApp) ShowQuestionDialog(title, message string) (string, error) 
 		Type:    runtime.QuestionDialog,
 		Title:   title,
 		Message: message,
+	})
+}
+
+// 启动 WebSocket 服务器
+func (na *NetworkApp) StartWebSocketServer() error {
+	return na.wsServer.Start()
+}
+
+// 停止 WebSocket 服务器
+func (na *NetworkApp) StopWebSocketServer() error {
+	return na.wsServer.Stop()
+}
+
+// 获取 WebSocket 端口
+func (na *NetworkApp) GetWebSocketPort() int {
+	return na.wsServer.GetWSPort()
+}
+
+// 获取 WebSocket 运行状态
+func (na *NetworkApp) IsWebSocketRunning() bool {
+	return na.wsServer.IsRunning()
+}
+
+// 发送消息到浏览器插件
+func (na *NetworkApp) SendToExtension(msgType string, data map[string]interface{}) {
+	na.wsServer.Broadcast(WSMessage{
+		Type: msgType,
+		Data: data,
 	})
 }
 
