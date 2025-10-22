@@ -115,7 +115,10 @@
       <div class="details-content">
         <div v-if="activeTab === 'headers'" class="headers-view">
           <div class="section">
-            <h4>常规</h4>
+            <div class="section-header">
+              <h4>常规</h4>
+              <button @click="copyGeneralInfo" class="copy-icon" title="复制">📋</button>
+            </div>
             <div class="kv-list">
               <div class="kv-item"><span class="key">Request URL:</span><span class="value">{{ selectedEntry.url }}</span></div>
               <div class="kv-item"><span class="key">Request Method:</span><span class="value">{{ selectedEntry.method }}</span></div>
@@ -123,7 +126,10 @@
             </div>
           </div>
           <div class="section" v-if="selectedEntry.request.headers">
-            <h4>请求标头</h4>
+            <div class="section-header">
+              <h4>请求标头</h4>
+              <button @click="copyRequestHeaders" class="copy-icon" title="复制">📋</button>
+            </div>
             <div class="kv-list">
               <div class="kv-item" v-for="(value, key) in selectedEntry.request.headers" :key="key">
                 <span class="key">{{ key }}:</span><span class="value">{{ value }}</span>
@@ -131,7 +137,10 @@
             </div>
           </div>
           <div class="section" v-if="selectedEntry.response.headers">
-            <h4>响应标头</h4>
+            <div class="section-header">
+              <h4>响应标头</h4>
+              <button @click="copyResponseHeaders" class="copy-icon" title="复制">📋</button>
+            </div>
             <div class="kv-list">
               <div class="kv-item" v-for="(value, key) in selectedEntry.response.headers" :key="key">
                 <span class="key">{{ key }}:</span><span class="value">{{ value }}</span>
@@ -481,6 +490,45 @@ function getHexContent(): string {
 function getBase64Content(): string {
   if (!selectedEntry.value?.response?.body) return ''
   return toBase64(decodeHtml(selectedEntry.value.response.body))
+}
+
+async function copyGeneralInfo() {
+  const entry = selectedEntry.value
+  if (!entry) return
+  
+  const data = {
+    'Request URL': entry.url,
+    'Request Method': entry.method,
+    'Status Code': entry.status ? `${entry.status} ${entry.statusText}` : undefined
+  }
+  
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(data, null, 2))
+  } catch (e) {
+    console.error('Copy failed:', e)
+  }
+}
+
+async function copyRequestHeaders() {
+  const entry = selectedEntry.value
+  if (!entry?.request?.headers) return
+  
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(entry.request.headers, null, 2))
+  } catch (e) {
+    console.error('Copy failed:', e)
+  }
+}
+
+async function copyResponseHeaders() {
+  const entry = selectedEntry.value
+  if (!entry?.response?.headers) return
+  
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(entry.response.headers, null, 2))
+  } catch (e) {
+    console.error('Copy failed:', e)
+  }
 }
 
 const codeBlock = ref<HTMLElement | null>(null)
@@ -883,12 +931,38 @@ function startResize(e: MouseEvent) {
   margin-bottom: 20px;
 }
 
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
 .section h4 {
-  margin: 0 0 8px 0;
+  margin: 0;
   font-size: 13px;
   font-weight: 600;
   color: #5f6368;
   text-align: left;
+}
+
+.copy-icon {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  transition: background 0.2s;
+  padding: 0;
+}
+
+.copy-icon:hover {
+  background: #e8eaed;
 }
 
 .kv-list {
