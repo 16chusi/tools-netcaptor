@@ -16,6 +16,7 @@ import { Dnd } from '@antv/x6-plugin-dnd'
 import { Selection } from '@antv/x6-plugin-selection'
 import { Keyboard } from '@antv/x6-plugin-keyboard'
 import type { WorkflowTask } from '../../types/workflow'
+import { NODE_CONFIGS } from './nodeConfigs'
 
 const props = defineProps<{
   task?: WorkflowTask
@@ -43,8 +44,6 @@ onMounted(() => {
   setupDragDrop()
   if (props.task) {
     loadTask(props.task)
-  } else {
-    createDefaultNodes()
   }
 })
 
@@ -52,11 +51,11 @@ onUnmounted(() => {
   graph?.dispose()
 })
 
-watch(() => props.task, (newTask) => {
-  if (newTask && graph) {
+watch(() => props.task, (newTask, oldTask) => {
+  if (newTask && graph && newTask.id !== oldTask?.id) {
     loadTask(newTask)
   }
-})
+}, { deep: false })
 
 function initGraph() {
   if (!containerRef.value) return
@@ -69,7 +68,8 @@ function initGraph() {
     height: containerRef.value.offsetHeight,
     autoResize: true,
     panning: {
-      enabled: true
+      enabled: true,
+      modifiers: 'shift'
     },
     mousewheel: {
       enabled: true,
@@ -79,35 +79,64 @@ function initGraph() {
       size: 10,
       visible: true
     },
+
+    highlighting: {
+      magnetAvailable: {
+        name: 'className',
+        args: {
+          className: 'available-magnet'
+        }
+      },
+      magnetAdsorbed: {
+        name: 'stroke',
+        args: {
+          attrs: {
+            fill: '#1890ff',
+            stroke: '#1890ff'
+          }
+        }
+      },
+      nodeAvailable: {
+        name: 'className',
+        args: {
+          className: 'node-available'
+        }
+      }
+    },
     connecting: {
-      snap: true,
+      snap: {
+        radius: 50
+      },
       allowBlank: false,
       allowLoop: false,
+      allowNode: false,
       highlight: true,
       connector: 'rounded',
       router: {
         name: 'manhattan'
+      },
+      createEdge() {
+        return this.createEdge({
+          attrs: {
+            line: {
+              stroke: '#1890ff',
+              strokeWidth: 2,
+              targetMarker: 'classic'
+            }
+          }
+        })
+      },
+      validateConnection({ sourceMagnet, targetMagnet }) {
+        return !!sourceMagnet && !!targetMagnet
       }
     },
-    highlighting: {
-      magnetAvailable: {
-        name: 'stroke',
-        args: {
-          attrs: {
-            fill: '#fff',
-            stroke: '#1890ff'
-          }
-        }
-      }
+    interacting: {
+      nodeMovable: true
     }
   })
 
   // 监听事件
-  graph.on('node:added', () => {
-    emitChange()
-  })
-
-  graph.on('node:removed', () => {
+  graph.on('node:change:position', () => {
     emitChange()
   })
 
@@ -118,6 +147,14 @@ function initGraph() {
         args: { distance: '50%' },
       },
     ])
+    emitChange()
+  })
+  
+  graph.on('edge:removed', () => {
+    emitChange()
+  })
+  
+  graph.on('node:removed', () => {
     emitChange()
   })
 
@@ -207,14 +244,14 @@ function addNode(type: string, label: string, x: number, y: number, color: strin
       },
       label: {
         text: label,
-        fill: '#fff',
+        fill: '#333',
         fontSize: 12
       }
     },
     ports: {
       groups: {
-        top: { position: 'top', attrs: { circle: { r: 8, magnet: true, stroke: '#fff', strokeWidth: 2, fill: color } } },
-        bottom: { position: 'bottom', attrs: { circle: { r: 8, magnet: true, stroke: '#fff', strokeWidth: 2, fill: color } } }
+        top: { position: 'top', attrs: { circle: { r: 6, magnet: true, stroke: '#1890ff', strokeWidth: 2, fill: '#fff' } } },
+        bottom: { position: 'bottom', attrs: { circle: { r: 6, magnet: true, stroke: '#1890ff', strokeWidth: 2, fill: '#fff' } } }
       },
       items: [{ group: 'top' }, { group: 'bottom' }]
     },
@@ -246,49 +283,45 @@ function createDefaultNodes() {
 
   console.log('[FlowCanvas] 创建默认节点')
 
-  // 开始节点 - 只有下方连接点
-  if (graph) {
-    graph.addNode({
-      x: 300,
-      y: 50,
-      width: 120,
-      height: 40,
-      shape: 'rect',
-      attrs: {
-        body: { fill: '#52c41a', stroke: '#52c41a', rx: 6, ry: 6 },
-        label: { text: '开始', fill: '#fff', fontSize: 12 }
+  // 开始节点 - 圆形绿色
+  graph.addNode({
+    x: 300,
+    y: 50,
+    width: 60,
+    height: 60,
+    shape: 'circle',
+    attrs: {
+      body: { fill: '#52c41a', stroke: '#52c41a' },
+      label: { text: '开始', fill: '#fff', fontSize: 12 }
+    },
+    ports: {
+      groups: {
+        bottom: { position: 'bottom', attrs: { circle: { r: 6, magnet: true, stroke: '#1890ff', strokeWidth: 2, fill: '#fff' } } }
       },
-      ports: {
-        groups: {
-          bottom: { position: 'bottom', attrs: { circle: { r: 8, magnet: true, stroke: '#fff', strokeWidth: 2, fill: '#52c41a' } } }
-        },
-        items: [{ group: 'bottom' }]
-      },
-      data: { type: 'start' }
-    })
-  }
+      items: [{ group: 'bottom' }]
+    },
+    data: { type: 'start' }
+  })
 
-  // 结束节点 - 只有上方连接点
-  if (graph) {
-    graph.addNode({
-      x: 300,
-      y: 400,
-      width: 120,
-      height: 40,
-      shape: 'rect',
-      attrs: {
-        body: { fill: '#f5222d', stroke: '#f5222d', rx: 6, ry: 6 },
-        label: { text: '结束', fill: '#fff', fontSize: 12 }
+  // 结束节点 - 圆形红色
+  graph.addNode({
+    x: 300,
+    y: 400,
+    width: 60,
+    height: 60,
+    shape: 'circle',
+    attrs: {
+      body: { fill: '#f5222d', stroke: '#f5222d' },
+      label: { text: '结束', fill: '#fff', fontSize: 12 }
+    },
+    ports: {
+      groups: {
+        top: { position: 'top', attrs: { circle: { r: 6, magnet: true, stroke: '#1890ff', strokeWidth: 2, fill: '#fff' } } }
       },
-      ports: {
-        groups: {
-          top: { position: 'top', attrs: { circle: { r: 8, magnet: true, stroke: '#fff', strokeWidth: 2, fill: '#f5222d' } } }
-        },
-        items: [{ group: 'top' }]
-      },
-      data: { type: 'end' }
-    })
-  }
+      items: [{ group: 'top' }]
+    },
+    data: { type: 'end' }
+  })
   
   console.log('[FlowCanvas] 节点数量:', graph.getNodes().length)
 }
@@ -298,10 +331,56 @@ function loadTask(task: WorkflowTask) {
 
   graph.clearCells()
 
-  task.nodes.forEach(node => {
-    const config = { type: node.type, label: node.label, color: '#1890ff' }
-    addNode(config.type, config.label, node.x, node.y, config.color)
-  })
+  if (task.nodes.length === 0) {
+    createDefaultNodes()
+  } else {
+    task.nodes.forEach(node => {
+      if (node.type === 'start') {
+        graph!.addNode({
+          x: node.x,
+          y: node.y,
+          width: 60,
+          height: 60,
+          shape: 'circle',
+          attrs: {
+            body: { fill: '#52c41a', stroke: '#52c41a' },
+            label: { text: '开始', fill: '#fff', fontSize: 12 }
+          },
+          ports: {
+            groups: {
+              bottom: { position: 'bottom', attrs: { circle: { r: 6, magnet: true, stroke: '#1890ff', strokeWidth: 2, fill: '#fff' } } }
+            },
+            items: [{ group: 'bottom' }]
+          },
+          data: { type: 'start' }
+        })
+      } else if (node.type === 'end') {
+        graph!.addNode({
+          x: node.x,
+          y: node.y,
+          width: 60,
+          height: 60,
+          shape: 'circle',
+          attrs: {
+            body: { fill: '#f5222d', stroke: '#f5222d' },
+            label: { text: '结束', fill: '#fff', fontSize: 12 }
+          },
+          ports: {
+            groups: {
+              top: { position: 'top', attrs: { circle: { r: 6, magnet: true, stroke: '#1890ff', strokeWidth: 2, fill: '#fff' } } }
+            },
+            items: [{ group: 'top' }]
+          },
+          data: { type: 'end' }
+        })
+      } else {
+        const config = NODE_CONFIGS.find(c => c.type === node.type)
+        if (config) {
+          addNode(config.type, config.label, node.x, node.y, config.color)
+        }
+      }
+    })
+  }
 }
 
 function showContextMenu(cell: any, clientX: number, clientY: number) {
@@ -335,30 +414,38 @@ function showContextMenu(cell: any, clientX: number, clientY: number) {
   }, 100)
 }
 
+let isEmitting = false
 function emitChange() {
-  if (!graph || !props.task) return
+  if (!graph || !props.task || isEmitting) return
+  
+  isEmitting = true
+  setTimeout(() => {
+    const nodes = graph!.getNodes().map(node => ({
+      id: node.id,
+      type: node.getData()?.type || 'unknown',
+      x: node.position().x,
+      y: node.position().y,
+      label: node.attr('label/text') as string,
+      data: node.getData()
+    }))
 
-  const nodes = graph.getNodes().map(node => ({
-    id: node.id,
-    type: node.getData()?.type || 'unknown',
-    x: node.position().x,
-    y: node.position().y,
-    label: node.attr('label/text') as string,
-    data: node.getData()
-  }))
+    const edges = graph!.getEdges().map(edge => ({
+      id: edge.id,
+      source: edge.getSourceCellId(),
+      target: edge.getTargetCellId()
+    }))
 
-  const edges = graph.getEdges().map(edge => ({
-    id: edge.id,
-    source: edge.getSourceCellId(),
-    target: edge.getTargetCellId()
-  }))
-
-  emit('change', {
-    ...props.task,
-    nodes,
-    edges,
-    updatedAt: new Date().toISOString()
-  })
+    emit('change', {
+      id: props.task!.id,
+      name: props.task!.name,
+      createdAt: props.task!.createdAt,
+      nodes,
+      edges,
+      updatedAt: new Date().toISOString()
+    })
+    
+    isEmitting = false
+  }, 0)
 }
 </script>
 
@@ -410,6 +497,7 @@ function emitChange() {
   min-height: 0;
   width: 100%;
   height: 100%;
+  user-select: none;
 }
 
 :deep(.context-menu) {
@@ -431,5 +519,46 @@ function emitChange() {
 
 :deep(.menu-item:hover) {
   background: #f5f5f5;
+}
+
+:deep(.available-magnet) {
+  fill: #1890ff !important;
+  stroke: #1890ff !important;
+  stroke-width: 3 !important;
+}
+
+:deep(.x6-node text) {
+  user-select: none;
+  pointer-events: none;
+}
+
+:deep(.x6-graph-svg) {
+  user-select: none;
+}
+
+:deep(.x6-graph-svg-stage) {
+  user-select: none;
+}
+
+:deep(.x6-port-body) {
+  fill: #fff;
+  stroke: #1890ff;
+  stroke-width: 2;
+}
+
+:deep(.x6-port) {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+:deep(.x6-node:hover .x6-port) {
+  opacity: 1;
+}
+
+:deep(.available-magnet .x6-port-body) {
+  fill: #1890ff !important;
+  stroke: #fff !important;
+  stroke-width: 3 !important;
+  r: 8 !important;
 }
 </style>

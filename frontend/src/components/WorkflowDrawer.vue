@@ -14,7 +14,7 @@
         />
         <div class="editor-area">
           <div class="canvas-wrapper">
-            <StencilPanel ref="stencilRef" :graph="graphInstance" />
+            <StencilPanel v-if="currentTask" ref="stencilRef" :graph="graphInstance" />
             <FlowCanvas
               ref="canvasRef"
               :task="currentTask"
@@ -120,7 +120,7 @@ function clearCanvas() {
 function onTaskChange(task: WorkflowTask) {
   const index = tasks.value.findIndex(t => t.id === task.id)
   if (index >= 0) {
-    tasks.value[index] = task
+    tasks.value[index] = { ...task }
   }
 }
 

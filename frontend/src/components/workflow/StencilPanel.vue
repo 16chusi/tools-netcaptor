@@ -30,19 +30,53 @@ function initStencil() {
     target: props.graph,
     stencilGraphWidth: 200,
     stencilGraphHeight: 800,
+    search: false,
+    collapsable: false,
+    validateNode: () => true,
     getDragNode: (node) => node.clone(),
     getDropNode: (node) => {
       const cloned = node.clone()
       const config = NODE_CONFIGS.find(c => c.type === node.getData()?.type)
       if (config) {
+        // 保持颜色
+        cloned.setAttrs({
+          body: {
+            fill: config.color,
+            stroke: config.color,
+            strokeWidth: 2,
+            rx: 8,
+            ry: 8
+          }
+        })
         // 添加连接点
-        cloned.addPort({ group: 'top' })
-        cloned.addPort({ group: 'bottom' })
         cloned.setProp('ports', {
           groups: {
-            top: { position: 'top', attrs: { circle: { r: 8, magnet: true, stroke: '#fff', fill: config.color, strokeWidth: 2 } } },
-            bottom: { position: 'bottom', attrs: { circle: { r: 8, magnet: true, stroke: '#fff', fill: config.color, strokeWidth: 2 } } }
-          }
+            top: { 
+              position: 'top',
+              attrs: { 
+                circle: { 
+                  r: 6, 
+                  magnet: true, 
+                  stroke: '#1890ff', 
+                  strokeWidth: 2,
+                  fill: '#fff'
+                } 
+              } 
+            },
+            bottom: { 
+              position: 'bottom',
+              attrs: { 
+                circle: { 
+                  r: 6, 
+                  magnet: true, 
+                  stroke: '#1890ff', 
+                  strokeWidth: 2,
+                  fill: '#fff'
+                } 
+              } 
+            }
+          },
+          items: [{ group: 'top' }, { group: 'bottom' }]
         })
         // 添加删除按钮
         cloned.addTools([
@@ -75,6 +109,11 @@ function initStencil() {
   })
   
   stencilRef.value.appendChild(stencil.container)
+  
+  // 确保 stencil 容器可以响应鼠标事件
+  const stencilContainer = stencil.container as HTMLElement
+  stencilContainer.style.position = 'relative'
+  stencilContainer.style.zIndex = '10'
   
   // 创建节点
   const nodes = NODE_CONFIGS.filter(c => c.type !== 'start' && c.type !== 'end').map(config => {
@@ -140,6 +179,12 @@ defineExpose({
   width: 200px;
   border-right: 1px solid #e0e0e0;
   background: white;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  position: relative;
+  z-index: 10;
 }
 
 .stencil-panel :deep(.x6-widget-stencil) {
@@ -167,5 +212,25 @@ defineExpose({
 
 .stencil-panel :deep(.x6-graph-svg) {
   background: white;
+}
+
+.stencil-panel :deep(.x6-node) {
+  cursor: move;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.stencil-panel :deep(text) {
+  user-select: none;
+  pointer-events: none;
+}
+
+.stencil-panel :deep(.x6-widget-stencil-content) {
+  position: relative;
+  z-index: 10;
+}
+
+.stencil-panel :deep(.x6-graph-svg-stage) {
+  pointer-events: auto;
 }
 </style>
