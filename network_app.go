@@ -8,11 +8,12 @@ import (
 )
 
 type NetworkApp struct {
-	ctx      context.Context
-	capture  *NetworkCapture
-	proxy    *GoProxyServer
-	webview  *WebViewCapture
-	wsServer *WebSocketServer
+	ctx              context.Context
+	capture          *NetworkCapture
+	proxy            *GoProxyServer
+	webview          *WebViewCapture
+	wsServer         *WebSocketServer
+	workflowExecutor *WorkflowExecutor
 }
 
 func NewNetworkApp() *NetworkApp {
@@ -23,6 +24,7 @@ func NewNetworkApp() *NetworkApp {
 		webview: NewWebViewCapture(capture),
 	}
 	app.wsServer = NewWebSocketServer(app)
+	app.workflowExecutor = NewWorkflowExecutor(app)
 	return app
 }
 
@@ -236,6 +238,30 @@ func (na *NetworkApp) SendToExtension(msgType string, data map[string]interface{
 		Type: msgType,
 		Data: data,
 	})
+}
+
+// 执行工作流
+func (na *NetworkApp) ExecuteWorkflow(task WorkflowTask) error {
+	go func() {
+		if err := na.workflowExecutor.Execute(task); err != nil {
+			if na.ctx != nil {
+				runtime.EventsEmit(na.ctx, "workflow_error", map[string]interface{}{
+					"error": err.Error(),
+				})
+			}
+		}
+	}()
+	return nil
+}
+
+// 停止工作流
+func (na *NetworkApp) StopWorkflow() {
+	na.workflowExecutor.Stop()
+}
+
+// 获取工作流运行状态
+func (na *NetworkApp) IsWorkflowRunning() bool {
+	return na.workflowExecutor.IsRunning()
 }
 
 // 导出到文件

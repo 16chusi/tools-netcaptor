@@ -154,6 +154,12 @@ func (ws *WebSocketServer) handleMessage(conn *websocket.Conn, msg WSMessage) {
 			runtime.EventsEmit(ws.app.ctx, "page_loaded", msg.Data)
 		}
 
+	case "action_result":
+		// 转发给工作流执行器
+		if ws.app.workflowExecutor != nil {
+			ws.app.workflowExecutor.HandleResponse(msg)
+		}
+
 	default:
 		log.Printf("[WebSocket] 未知消息类型: %s", msg.Type)
 	}
@@ -181,4 +187,10 @@ func (ws *WebSocketServer) GetWSPort() int {
 
 func (ws *WebSocketServer) IsRunning() bool {
 	return ws.running
+}
+
+func (ws *WebSocketServer) HasClients() bool {
+	ws.mu.RLock()
+	defer ws.mu.RUnlock()
+	return len(ws.clients) > 0
 }

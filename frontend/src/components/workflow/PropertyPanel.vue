@@ -139,14 +139,17 @@ const emit = defineEmits<{
 const formData = ref<Record<string, any>>({})
 
 watch(() => props.nodeData, (newData) => {
+  console.log('[PropertyPanel] watch nodeData 变化:', newData)
   if (newData) {
     formData.value = { ...newData }
   } else {
     formData.value = {}
   }
-}, { immediate: true })
+  console.log('[PropertyPanel] formData 已更新:', formData.value)
+}, { immediate: true, deep: true })
 
 function handleSave() {
+  console.log('[PropertyPanel] 保存节点数据:', props.nodeType, formData.value)
   emit('save', formData.value)
   emit('close')
 }

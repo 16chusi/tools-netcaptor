@@ -2,8 +2,15 @@
   <div class="flow-canvas">
     <div class="canvas-toolbar">
       <button @click="$emit('save')" class="toolbar-btn">💾 保存</button>
-      <button @click="$emit('run')" class="toolbar-btn primary">▶️ 运行</button>
+      <button @click="handleRun" :disabled="isRunning" class="toolbar-btn primary">
+        {{ isRunning ? '⏸️ 运行中...' : '▶️ 运行' }}
+      </button>
+      <button v-if="isRunning" @click="handleStop" class="toolbar-btn danger">⏹️ 停止</button>
       <button @click="$emit('clear')" class="toolbar-btn">🧹 清空</button>
+      <div v-if="executionStatus" class="status-info">
+        <span>{{ executionStatus.currentStep }}/{{ executionStatus.totalSteps }}</span>
+        <span :class="'status-' + executionStatus.status">{{ getStatusText(executionStatus.status) }}</span>
+      </div>
     </div>
     <div ref="containerRef" class="canvas-container"></div>
   </div>
@@ -15,18 +22,23 @@ import { Graph } from '@antv/x6'
 import { Dnd } from '@antv/x6-plugin-dnd'
 import { Selection } from '@antv/x6-plugin-selection'
 import { Keyboard } from '@antv/x6-plugin-keyboard'
-import type { WorkflowTask } from '../../types/workflow'
 import { NODE_CONFIGS } from './nodeConfigs'
+import { ExecuteWorkflow, StopWorkflow } from '../../../wailsjs/go/main/NetworkApp'
+import { EventsOn } from '../../../wailsjs/runtime/runtime'
+import { main } from '../../../wailsjs/go/models'
+import toast from "../Toast.vue";
+
+type WorkflowTask = main.WorkflowTask
 
 const props = defineProps<{
-  task?: WorkflowTask
+  task?: any
 }>()
 
 const emit = defineEmits<{
   save: []
   run: []
   clear: []
-  change: [task: WorkflowTask]
+  change: [task: any]
   selectNode: [node: any]
   graphReady: [graph: Graph]
 }>()
@@ -35,6 +47,8 @@ const containerRef = ref<HTMLDivElement>()
 let graph: Graph | null = null
 let dnd: Dnd | null = null
 const hasSelection = ref(false)
+const isRunning = ref(false)
+const executionStatus = ref<any>(null)
 
 onMounted(() => {
   console.log('[FlowCanvas] 组件已挂载')
@@ -45,6 +59,31 @@ onMounted(() => {
   if (props.task) {
     loadTask(props.task)
   }
+  
+  // 监听工作流状态
+  EventsOn('workflow_status', (status: any) => {
+    console.log('[FlowCanvas] 工作流状态:', status)
+    executionStatus.value = status
+    isRunning.value = status.status === 'running'
+    
+    // 高亮当前执行的节点
+    if (status.currentNode && graph) {
+      highlightNode(status.currentNode)
+    }
+  })
+  
+  EventsOn('workflow_error', (data: any) => {
+    console.error('[FlowCanvas] 工作流错误:', data.error)
+    const errorMsg = data.error || '未知错误'
+    if (errorMsg.includes('超时') || errorMsg.includes('timeout')) {
+      toast.error('执行超时：浏览器扩展未响应，请检查扩展是否已安装并连接')
+    } else if (errorMsg.includes('未连接') || errorMsg.includes('not connected')) {
+      toast.error('浏览器扩展未连接，请先安装并启用扩展')
+    } else {
+      toast.error('执行失败: ' + errorMsg)
+    }
+    isRunning.value = false
+  })
 })
 
 onUnmounted(() => {
@@ -160,12 +199,14 @@ function initGraph() {
 
   // 监听节点点击
   graph.on('node:click', ({ node }) => {
+    const data = node.getData() || {}
     const nodeData = {
       id: node.id,
-      type: node.getData()?.type,
+      type: data.type,
       label: node.attr('label/text'),
-      data: node.getData()
+      data: data // 传递完整的 data 对象
     }
+    console.log('[FlowCanvas] 节点点击:', nodeData)
     emit('selectNode', nodeData)
   })
 
@@ -255,7 +296,7 @@ function addNode(type: string, label: string, x: number, y: number, color: strin
       },
       items: [{ group: 'top' }, { group: 'bottom' }]
     },
-    data: { type }
+    data: { type } // 初始化时只设置 type，其他属性由 PropertyPanel 设置
   }
 
   // 只有非开始/结束节点才添加删除按钮
@@ -376,7 +417,12 @@ function loadTask(task: WorkflowTask) {
       } else {
         const config = NODE_CONFIGS.find(c => c.type === node.type)
         if (config) {
-          addNode(config.type, config.label, node.x, node.y, config.color)
+          const newNode = addNode(config.type, config.label, node.x, node.y, config.color)
+          // 加载节点数据，确保包含 type 和其他属性
+          if (newNode && node.data) {
+            newNode.setData({ type: node.type, ...node.data })
+            console.log('[FlowCanvas] 节点数据已加载:', node.id, newNode.getData())
+          }
         }
       }
     })
@@ -414,20 +460,115 @@ function showContextMenu(cell: any, clientX: number, clientY: number) {
   }, 100)
 }
 
+async function handleRun() {
+  if (!props.task || isRunning.value) return
+  
+  try {
+    isRunning.value = true
+    executionStatus.value = null
+    
+    console.log('[FlowCanvas] ========== 开始执行任务 ==========')
+    console.log('[FlowCanvas] 任务名称:', props.task.name)
+    console.log('[FlowCanvas] 任务ID:', props.task.id)
+    console.log('[FlowCanvas] 节点数量:', props.task.nodes?.length || 0)
+    
+    // 打印每个节点的详细信息
+    if (props.task.nodes) {
+      props.task.nodes.forEach((node: any, index: number) => {
+        console.log(`[FlowCanvas] 节点[${index}] - ID: ${node.id}, Type: ${node.type}, Label: ${node.label}`)
+        console.log(`[FlowCanvas] 节点[${index}] - Data:`, node.data)
+        if (node.data) {
+          Object.keys(node.data).forEach(key => {
+            console.log(`[FlowCanvas] 节点[${index}] - Data.${key} =`, node.data[key], `(type: ${typeof node.data[key]})`)
+          })
+        }
+      })
+    }
+    
+    console.log('[FlowCanvas] 完整任务数据:', JSON.stringify(props.task, null, 2))
+    
+    // 使用 Wails 生成的类型构造函数
+    const task = main.WorkflowTask.createFrom(props.task)
+    console.log('[FlowCanvas] 转换后的任务:', task)
+    
+    await ExecuteWorkflow(task)
+  } catch (error: any) {
+    console.error('[FlowCanvas] 执行失败:', error)
+    const errorMsg = error.message || error.toString()
+    if (errorMsg.includes('超时') || errorMsg.includes('timeout')) {
+      toast.error('执行超时：浏览器扩展未响应，请检查扩展是否已安装并连接')
+    } else if (errorMsg.includes('未连接') || errorMsg.includes('not connected') || errorMsg.includes('未运行')) {
+      toast.error('浏览器扩展未连接，请先安装并启用扩展')
+    } else {
+      toast.error('执行失败: ' + errorMsg)
+    }
+    isRunning.value = false
+  }
+}
+
+async function handleStop() {
+  try {
+    await StopWorkflow()
+    isRunning.value = false
+  } catch (error: any) {
+    console.error('[FlowCanvas] 停止失败:', error)
+  }
+}
+
+function highlightNode(nodeId: string) {
+  if (!graph) return
+  
+  // 清除之前的高亮
+  graph.getNodes().forEach(node => {
+    node.attr('body/stroke', node.getData()?.type === 'start' ? '#52c41a' : 
+                             node.getData()?.type === 'end' ? '#f5222d' : 
+                             node.attr('body/fill'))
+    node.attr('body/strokeWidth', 1)
+  })
+  
+  // 高亮当前节点
+  const node = graph.getCellById(nodeId)
+  if (node) {
+    node.attr('body/stroke', '#ff4d4f')
+    node.attr('body/strokeWidth', 3)
+  }
+}
+
+function getStatusText(status: string): string {
+  const statusMap: Record<string, string> = {
+    running: '运行中',
+    success: '成功',
+    failed: '失败',
+    stopped: '已停止'
+  }
+  return statusMap[status] || status
+}
+
 let isEmitting = false
 function emitChange() {
   if (!graph || !props.task || isEmitting) return
   
   isEmitting = true
   setTimeout(() => {
-    const nodes = graph!.getNodes().map(node => ({
-      id: node.id,
-      type: node.getData()?.type || 'unknown',
-      x: node.position().x,
-      y: node.position().y,
-      label: node.attr('label/text') as string,
-      data: node.getData()
-    }))
+    console.log('[FlowCanvas] ========== emitChange 开始 ==========')
+    
+    const nodes = graph!.getNodes().map((node, index) => {
+      const nodeData = node.getData() || {}
+      console.log(`[FlowCanvas] 序列化节点[${index}] - ID: ${node.id}`)
+      console.log(`[FlowCanvas] 序列化节点[${index}] - getData():`, nodeData)
+      
+      const serializedNode = {
+        id: node.id,
+        type: nodeData.type || 'unknown',
+        x: node.position().x,
+        y: node.position().y,
+        label: node.attr('label/text') as string,
+        data: nodeData // 这里包含 type 和其他所有属性（如 url, selector 等）
+      }
+      
+      console.log(`[FlowCanvas] 序列化节点[${index}] - 结果:`, serializedNode)
+      return serializedNode
+    })
 
     const edges = graph!.getEdges().map(edge => ({
       id: edge.id,
@@ -435,14 +576,16 @@ function emitChange() {
       target: edge.getTargetCellId()
     }))
 
-    emit('change', {
+    const updatedTask = {
       id: props.task!.id,
       name: props.task!.name,
+      description: props.task!.description,
       createdAt: props.task!.createdAt,
+      updatedAt: new Date().toISOString(),
       nodes,
-      edges,
-      updatedAt: new Date().toISOString()
-    })
+      edges
+    }
+    emit('change', updatedTask)
     
     isEmitting = false
   }, 0)
@@ -488,6 +631,50 @@ function emitChange() {
 
 .toolbar-btn.primary:hover {
   background: #40a9ff;
+}
+
+.toolbar-btn.danger {
+  background: #ff4d4f;
+  color: white;
+  border-color: #ff4d4f;
+}
+
+.toolbar-btn.danger:hover {
+  background: #ff7875;
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.status-info {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: #666;
+}
+
+.status-running {
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.status-success {
+  color: #52c41a;
+  font-weight: 500;
+}
+
+.status-failed {
+  color: #ff4d4f;
+  font-weight: 500;
+}
+
+.status-stopped {
+  color: #faad14;
+  font-weight: 500;
 }
 
 .canvas-container {

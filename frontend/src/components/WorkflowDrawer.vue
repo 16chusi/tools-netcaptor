@@ -19,7 +19,6 @@
               ref="canvasRef"
               :task="currentTask"
               @save="saveTask"
-              @run="runTask"
               @clear="clearCanvas"
               @change="onTaskChange"
               @selectNode="onSelectNode"
@@ -47,7 +46,17 @@ import TaskList from './workflow/TaskList.vue'
 import StencilPanel from './workflow/StencilPanel.vue'
 import FlowCanvas from './workflow/FlowCanvas.vue'
 import PropertyPanel from './workflow/PropertyPanel.vue'
-import type { WorkflowTask } from '../types/workflow'
+import { toast } from '../utils/toast'
+
+interface WorkflowTask {
+  id: string
+  name: string
+  description?: string
+  createdAt: string
+  updatedAt: string
+  nodes: any[]
+  edges: any[]
+}
 
 const props = defineProps<{
   visible: boolean
@@ -100,13 +109,30 @@ function createTask() {
 
 function saveTask() {
   if (!currentTask.value) return
+  
+  console.log('[WorkflowDrawer] ========== 保存任务 ==========')
+  console.log('[WorkflowDrawer] 当前任务:', currentTask.value)
+  console.log('[WorkflowDrawer] 所有任务:', tasks.value)
+  
+  // 打印当前任务的节点数据
+  if (currentTask.value.nodes) {
+    currentTask.value.nodes.forEach((node: any, index: number) => {
+      console.log(`[WorkflowDrawer] 保存节点[${index}]:`, node)
+      console.log(`[WorkflowDrawer] 保存节点[${index}] data:`, node.data)
+    })
+  }
+  
   localStorage.setItem('workflow-tasks', JSON.stringify(tasks.value))
-  alert('保存成功')
-}
-
-function runTask() {
-  if (!currentTask.value) return
-  alert('运行功能开发中...')
+  console.log('[WorkflowDrawer] ✓ 保存到 localStorage 成功')
+  
+  // 验证保存
+  const saved = localStorage.getItem('workflow-tasks')
+  if (saved) {
+    const parsed = JSON.parse(saved)
+    console.log('[WorkflowDrawer] 验证保存的数据:', parsed)
+  }
+  
+  toast.success('保存成功')
 }
 
 function clearCanvas() {
@@ -117,7 +143,7 @@ function clearCanvas() {
   }
 }
 
-function onTaskChange(task: WorkflowTask) {
+function onTaskChange(task: any) {
   const index = tasks.value.findIndex(t => t.id === task.id)
   if (index >= 0) {
     tasks.value[index] = { ...task }
@@ -130,14 +156,54 @@ function onSelectNode(node: any) {
   if (node.type === 'start' || node.type === 'end') {
     return
   }
-  selectedNode.value = node
+  console.log('[WorkflowDrawer] ========== 选中节点 ==========')
+  console.log('[WorkflowDrawer] 节点ID:', node.id)
+  console.log('[WorkflowDrawer] 节点类型:', node.type)
+  console.log('[WorkflowDrawer] 节点 data:', node.data)
+  
+  // 确保传递完整的节点数据
+  selectedNode.value = {
+    id: node.id,
+    type: node.type,
+    label: node.label,
+    data: node.data || {}
+  }
+  
+  console.log('[WorkflowDrawer] 传递给 PropertyPanel 的数据:', selectedNode.value.data)
   propertyVisible.value = true
 }
 
 function onSaveNodeData(data: Record<string, any>) {
-  if (!selectedNode.value) return
+  if (!selectedNode.value || !graphInstance.value) return
+  
+  console.log('[WorkflowDrawer] ========== 保存节点数据 ==========')
+  console.log('[WorkflowDrawer] 节点ID:', selectedNode.value.id)
+  console.log('[WorkflowDrawer] 节点类型:', selectedNode.value.type)
+  console.log('[WorkflowDrawer] 保存的数据:', data)
+  
+  const node = graphInstance.value.getCellById(selectedNode.value.id)
+  if (node) {
+    const currentData = node.getData() || {}
+    console.log('[WorkflowDrawer] 当前节点数据:', currentData)
+    
+    const updatedData = { ...currentData, ...data }
+    console.log('[WorkflowDrawer] 合并后的数据:', updatedData)
+    
+    node.setData(updatedData)
+    
+    const verifyData = node.getData()
+    console.log('[WorkflowDrawer] 验证保存后的数据:', verifyData)
+    console.log('[WorkflowDrawer] ✓ 节点数据已更新')
+    
+    // 触发 change 事件
+    const pos = node.position()
+    node.position(pos.x + 0.01, pos.y)
+    node.position(pos.x, pos.y)
+  } else {
+    console.error('[WorkflowDrawer] ❌ 未找到节点:', selectedNode.value.id)
+  }
+  
   selectedNode.value.data = { ...selectedNode.value.data, ...data }
-  console.log('保存节点数据:', selectedNode.value)
 }
 
 // 加载任务
