@@ -54,7 +54,7 @@ defineExpose({ show })
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  z-index: 9999;
+  z-index: 10000;
   min-width: 200px;
   max-width: 400px;
 }

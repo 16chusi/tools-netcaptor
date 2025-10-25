@@ -1,7 +1,6 @@
 <template>
   <div class="flow-canvas">
-    <div class="canvas-toolbar">
-      <button @click="$emit('save')" class="toolbar-btn">💾 保存</button>
+    <div v-if="props.task" class="canvas-toolbar">
       <button @click="handleRun" :disabled="isRunning" class="toolbar-btn primary">
         {{ isRunning ? '⏸️ 运行中...' : '▶️ 运行' }}
       </button>
@@ -17,16 +16,14 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
-import { Graph } from '@antv/x6'
-import { Dnd } from '@antv/x6-plugin-dnd'
-import { Selection } from '@antv/x6-plugin-selection'
-import { Keyboard } from '@antv/x6-plugin-keyboard'
-import { NODE_CONFIGS } from './nodeConfigs'
-import { ExecuteWorkflow, StopWorkflow } from '../../../wailsjs/go/main/NetworkApp'
-import { EventsOn } from '../../../wailsjs/runtime/runtime'
-import { main } from '../../../wailsjs/go/models'
-import toast from "../Toast.vue";
+import {onMounted, onUnmounted, ref, watch} from 'vue'
+import {Graph} from '@antv/x6'
+import {Dnd} from '@antv/x6-plugin-dnd'
+import {NODE_CONFIGS} from './nodeConfigs'
+import {ExecuteWorkflow, IsWebSocketRunning, StopWorkflow} from '../../../wailsjs/go/main/NetworkApp'
+import {EventsOn} from '../../../wailsjs/runtime/runtime'
+import {main} from '../../../wailsjs/go/models'
+import {toast} from '../../utils/toast';
 
 type WorkflowTask = main.WorkflowTask
 
@@ -35,7 +32,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  save: []
   run: []
   clear: []
   change: [task: any]
@@ -180,6 +176,7 @@ function initGraph() {
   })
 
   graph.on('edge:connected', ({ edge }) => {
+    console.log('[FlowCanvas] 边已连接:', edge.id, edge.getSourceCellId(), '->', edge.getTargetCellId())
     edge.addTools([
       {
         name: 'button-remove',
@@ -375,9 +372,13 @@ function loadTask(task: WorkflowTask) {
   if (task.nodes.length === 0) {
     createDefaultNodes()
   } else {
+    // 加载节点
+    const nodeIdMap = new Map()
     task.nodes.forEach(node => {
+      let newNode
       if (node.type === 'start') {
-        graph!.addNode({
+        newNode = graph!.addNode({
+          id: node.id,
           x: node.x,
           y: node.y,
           width: 60,
@@ -396,7 +397,8 @@ function loadTask(task: WorkflowTask) {
           data: { type: 'start' }
         })
       } else if (node.type === 'end') {
-        graph!.addNode({
+        newNode = graph!.addNode({
+          id: node.id,
           x: node.x,
           y: node.y,
           width: 60,
@@ -417,15 +419,79 @@ function loadTask(task: WorkflowTask) {
       } else {
         const config = NODE_CONFIGS.find(c => c.type === node.type)
         if (config) {
-          const newNode = addNode(config.type, config.label, node.x, node.y, config.color)
-          // 加载节点数据，确保包含 type 和其他属性
+          newNode = graph!.addNode({
+            id: node.id,
+            x: node.x,
+            y: node.y,
+            width: 120,
+            height: 40,
+            shape: 'rect',
+            attrs: {
+              body: {
+                fill: config.color,
+                stroke: config.color,
+                rx: 6,
+                ry: 6
+              },
+              label: {
+                text: config.label,
+                fill: '#333',
+                fontSize: 12
+              }
+            },
+            ports: {
+              groups: {
+                top: { position: 'top', attrs: { circle: { r: 6, magnet: true, stroke: '#1890ff', strokeWidth: 2, fill: '#fff' } } },
+                bottom: { position: 'bottom', attrs: { circle: { r: 6, magnet: true, stroke: '#1890ff', strokeWidth: 2, fill: '#fff' } } }
+              },
+              items: [{ group: 'top' }, { group: 'bottom' }]
+            },
+            data: node.data || { type: node.type },
+            tools: [
+              {
+                name: 'button-remove',
+                args: {
+                  x: '100%',
+                  y: 0,
+                  offset: { x: -10, y: 10 },
+                },
+              },
+            ]
+          })
           if (newNode && node.data) {
             newNode.setData({ type: node.type, ...node.data })
-            console.log('[FlowCanvas] 节点数据已加载:', node.id, newNode.getData())
           }
         }
       }
+      if (newNode) {
+        nodeIdMap.set(node.id, newNode)
+      }
     })
+    
+    // 加载边
+    if (task.edges && task.edges.length > 0) {
+      task.edges.forEach(edge => {
+        graph!.addEdge({
+          id: edge.id,
+          source: edge.source,
+          target: edge.target,
+          attrs: {
+            line: {
+              stroke: '#1890ff',
+              strokeWidth: 2,
+              targetMarker: 'classic'
+            }
+          },
+          tools: [
+            {
+              name: 'button-remove',
+              args: { distance: '50%' },
+            },
+          ]
+        })
+      })
+      console.log('[FlowCanvas] 已加载', task.edges.length, '条边')
+    }
   }
 }
 
@@ -462,6 +528,13 @@ function showContextMenu(cell: any, clientX: number, clientY: number) {
 
 async function handleRun() {
   if (!props.task || isRunning.value) return
+  
+  // 检查 WebSocket 状态
+  const wsRunning = await IsWebSocketRunning()
+  if (!wsRunning) {
+    toast.error('请先启动 WebSocket 服务')
+    return
+  }
   
   try {
     isRunning.value = true
@@ -570,11 +643,17 @@ function emitChange() {
       return serializedNode
     })
 
-    const edges = graph!.getEdges().map(edge => ({
-      id: edge.id,
-      source: edge.getSourceCellId(),
-      target: edge.getTargetCellId()
-    }))
+    const edges = graph!.getEdges().map((edge, index) => {
+      const edgeData = {
+        id: edge.id,
+        source: edge.getSourceCellId(),
+        target: edge.getTargetCellId()
+      }
+      console.log(`[FlowCanvas] 序列化边[${index}]:`, edgeData)
+      return edgeData
+    })
+    
+    console.log('[FlowCanvas] 总计序列化:', nodes.length, '个节点,', edges.length, '条边')
 
     const updatedTask = {
       id: props.task!.id,
@@ -585,6 +664,7 @@ function emitChange() {
       nodes,
       edges
     }
+    console.log('[FlowCanvas] 发送 change 事件:', updatedTask)
     emit('change', updatedTask)
     
     isEmitting = false
@@ -606,6 +686,7 @@ function emitChange() {
   background: white;
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 .toolbar-btn {
@@ -629,8 +710,18 @@ function emitChange() {
   border-color: #1890ff;
 }
 
-.toolbar-btn.primary:hover {
+.toolbar-btn.primary:hover:not(:disabled) {
   background: #40a9ff;
+}
+
+.toolbar-btn.success {
+  background: #52c41a;
+  color: white;
+  border-color: #52c41a;
+}
+
+.toolbar-btn.success:hover {
+  background: #73d13d;
 }
 
 .toolbar-btn.danger {

@@ -1,11 +1,13 @@
 import { createApp, h } from 'vue'
 import Toast from '../components/Toast.vue'
 
-let toastInstance: any = null
+let currentApp: any = null
+let currentContainer: HTMLElement | null = null
 
 function showToast(message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info', duration = 3000) {
-  if (toastInstance) {
-    toastInstance.unmount()
+  if (currentApp && currentContainer) {
+    currentApp.unmount()
+    document.body.removeChild(currentContainer)
   }
 
   const container = document.createElement('div')
@@ -17,13 +19,23 @@ function showToast(message: string, type: 'success' | 'error' | 'warning' | 'inf
     }
   })
 
-  toastInstance = app.mount(container)
-  toastInstance.show()
+  const instance = app.mount(container)
+  currentApp = app
+  currentContainer = container
+  
+  if (instance && typeof instance.show === 'function') {
+    instance.show()
+  }
 
   setTimeout(() => {
-    app.unmount()
-    document.body.removeChild(container)
-    toastInstance = null
+    if (currentApp === app) {
+      app.unmount()
+      if (currentContainer && document.body.contains(currentContainer)) {
+        document.body.removeChild(currentContainer)
+      }
+      currentApp = null
+      currentContainer = null
+    }
   }, duration + 500)
 }
 

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"os"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -14,6 +16,7 @@ type NetworkApp struct {
 	webview          *WebViewCapture
 	wsServer         *WebSocketServer
 	workflowExecutor *WorkflowExecutor
+	workflowStorage  *WorkflowStorage
 }
 
 func NewNetworkApp() *NetworkApp {
@@ -25,6 +28,15 @@ func NewNetworkApp() *NetworkApp {
 	}
 	app.wsServer = NewWebSocketServer(app)
 	app.workflowExecutor = NewWorkflowExecutor(app)
+
+	// 初始化存储
+	storage, err := NewWorkflowStorage()
+	if err != nil {
+		log.Printf("[App] 初始化存储失败: %v", err)
+	} else {
+		app.workflowStorage = storage
+	}
+
 	return app
 }
 
@@ -262,6 +274,38 @@ func (na *NetworkApp) StopWorkflow() {
 // 获取工作流运行状态
 func (na *NetworkApp) IsWorkflowRunning() bool {
 	return na.workflowExecutor.IsRunning()
+}
+
+// 保存工作流任务
+func (na *NetworkApp) SaveWorkflowTask(task WorkflowTask) error {
+	if na.workflowStorage == nil {
+		return fmt.Errorf("存储未初始化")
+	}
+	return na.workflowStorage.SaveTask(task)
+}
+
+// 获取工作流任务
+func (na *NetworkApp) GetWorkflowTask(id string) (*WorkflowTask, error) {
+	if na.workflowStorage == nil {
+		return nil, fmt.Errorf("存储未初始化")
+	}
+	return na.workflowStorage.GetTask(id)
+}
+
+// 获取所有工作流任务
+func (na *NetworkApp) GetAllWorkflowTasks() ([]WorkflowTask, error) {
+	if na.workflowStorage == nil {
+		return nil, fmt.Errorf("存储未初始化")
+	}
+	return na.workflowStorage.GetAllTasks()
+}
+
+// 删除工作流任务
+func (na *NetworkApp) DeleteWorkflowTask(id string) error {
+	if na.workflowStorage == nil {
+		return fmt.Errorf("存储未初始化")
+	}
+	return na.workflowStorage.DeleteTask(id)
 }
 
 // 导出到文件

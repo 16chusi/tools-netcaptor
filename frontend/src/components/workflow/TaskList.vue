@@ -11,8 +11,11 @@
         :class="['task-item', { active: selectedTaskId === task.id }]"
         @click="$emit('select', task.id)"
       >
-        <div class="task-name">{{ task.name }}</div>
-        <div class="task-meta">{{ formatDate(task.updatedAt) }}</div>
+        <div class="task-info">
+          <div class="task-name">{{ task.name }}</div>
+          <div class="task-meta">{{ formatDate(task.updatedAt) }}</div>
+        </div>
+        <button @click.stop="$emit('delete', task.id)" class="delete-btn" title="删除任务">×</button>
       </div>
       <div v-if="tasks.length === 0" class="empty">
         暂无任务,点击"新建"创建
@@ -32,6 +35,7 @@ defineProps<{
 defineEmits<{
   select: [id: string]
   create: []
+  delete: [id: string]
 }>()
 
 function formatDate(date: string) {
@@ -86,6 +90,15 @@ function formatDate(date: string) {
   border-bottom: 1px solid #f0f0f0;
   cursor: pointer;
   transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.task-info {
+  flex: 1;
+  min-width: 0;
 }
 
 .task-item:hover {
@@ -101,6 +114,34 @@ function formatDate(date: string) {
   font-size: 13px;
   font-weight: 500;
   margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delete-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: #999;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+  border-radius: 2px;
+  opacity: 0;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.task-item:hover .delete-btn {
+  opacity: 1;
+}
+
+.delete-btn:hover {
+  background: #ff4d4f;
+  color: white;
 }
 
 .task-meta {

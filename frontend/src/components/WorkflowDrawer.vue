@@ -3,7 +3,13 @@
     <div class="drawer" @click.stop>
       <div class="drawer-header">
         <h3>🔄 任务流编排</h3>
-        <button @click="$emit('close')" class="close-icon">✕</button>
+        <div class="header-controls">
+          <button @click="toggleWebSocket" :class="['ws-btn', wsRunning ? 'danger' : 'success']">
+            {{ wsRunning ? '⏹️ 停止服务' : '▶️ 启动服务' }}
+          </button>
+          <span v-if="wsRunning" @click="copyPort" class="ws-port" title="点击复制端口">端口: {{ wsPort }}</span>
+          <button @click="$emit('close')" class="close-icon">✕</button>
+        </div>
       </div>
       <div class="drawer-content">
         <TaskList
@@ -11,6 +17,7 @@
           :selectedTaskId="selectedTaskId"
           @select="selectTask"
           @create="createTask"
+          @delete="deleteTask"
         />
         <div class="editor-area">
           <div class="canvas-wrapper">
@@ -18,7 +25,6 @@
             <FlowCanvas
               ref="canvasRef"
               :task="currentTask"
-              @save="saveTask"
               @clear="clearCanvas"
               @change="onTaskChange"
               @selectNode="onSelectNode"
@@ -40,13 +46,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Graph } from '@antv/x6'
 import TaskList from './workflow/TaskList.vue'
 import StencilPanel from './workflow/StencilPanel.vue'
 import FlowCanvas from './workflow/FlowCanvas.vue'
 import PropertyPanel from './workflow/PropertyPanel.vue'
 import { toast } from '../utils/toast'
+import { SaveWorkflowTask, GetAllWorkflowTasks, DeleteWorkflowTask, StartWebSocketServer, StopWebSocketServer, GetWebSocketPort, IsWebSocketRunning } from '../../wailsjs/go/main/NetworkApp'
+import { main } from '../../wailsjs/go/models'
 
 interface WorkflowTask {
   id: string
@@ -65,6 +73,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
 }>()
+
+const wsRunning = ref(false)
+const wsPort = ref(0)
 
 const tasks = ref<WorkflowTask[]>([])
 const selectedTaskId = ref<string>()
@@ -94,8 +105,8 @@ function selectTask(id: string) {
   selectedTaskId.value = id
 }
 
-function createTask() {
-  const newTask: WorkflowTask = {
+async function createTask() {
+  const taskData = {
     id: Date.now().toString(),
     name: `任务 ${tasks.value.length + 1}`,
     createdAt: new Date().toISOString(),
@@ -103,36 +114,35 @@ function createTask() {
     nodes: [],
     edges: []
   }
-  tasks.value.push(newTask)
-  selectedTaskId.value = newTask.id
+  
+  try {
+    const newTask = main.WorkflowTask.createFrom(taskData)
+    await SaveWorkflowTask(newTask)
+    tasks.value.push(taskData)
+    selectedTaskId.value = taskData.id
+    toast.success('任务创建成功')
+  } catch (error: any) {
+    console.error('[WorkflowDrawer] 创建任务失败:', error)
+    toast.error('创建失败: ' + error.message)
+  }
 }
 
-function saveTask() {
-  if (!currentTask.value) return
+
+
+async function deleteTask(id: string) {
+  if (!confirm('确定删除该任务？')) return
   
-  console.log('[WorkflowDrawer] ========== 保存任务 ==========')
-  console.log('[WorkflowDrawer] 当前任务:', currentTask.value)
-  console.log('[WorkflowDrawer] 所有任务:', tasks.value)
-  
-  // 打印当前任务的节点数据
-  if (currentTask.value.nodes) {
-    currentTask.value.nodes.forEach((node: any, index: number) => {
-      console.log(`[WorkflowDrawer] 保存节点[${index}]:`, node)
-      console.log(`[WorkflowDrawer] 保存节点[${index}] data:`, node.data)
-    })
+  try {
+    await DeleteWorkflowTask(id)
+    tasks.value = tasks.value.filter(t => t.id !== id)
+    if (selectedTaskId.value === id) {
+      selectedTaskId.value = undefined
+    }
+    toast.success('删除成功')
+  } catch (error: any) {
+    console.error('[WorkflowDrawer] 删除失败:', error)
+    toast.error('删除失败: ' + error.message)
   }
-  
-  localStorage.setItem('workflow-tasks', JSON.stringify(tasks.value))
-  console.log('[WorkflowDrawer] ✓ 保存到 localStorage 成功')
-  
-  // 验证保存
-  const saved = localStorage.getItem('workflow-tasks')
-  if (saved) {
-    const parsed = JSON.parse(saved)
-    console.log('[WorkflowDrawer] 验证保存的数据:', parsed)
-  }
-  
-  toast.success('保存成功')
 }
 
 function clearCanvas() {
@@ -143,10 +153,27 @@ function clearCanvas() {
   }
 }
 
-function onTaskChange(task: any) {
+async function onTaskChange(task: any) {
+  console.log('[WorkflowDrawer] ========== onTaskChange ==========')
+  console.log('[WorkflowDrawer] 更新任务:', task)
   const index = tasks.value.findIndex(t => t.id === task.id)
   if (index >= 0) {
     tasks.value[index] = { ...task }
+    console.log('[WorkflowDrawer] ✓ 任务已更新到列表')
+    
+    // 自动保存
+    await autoSaveTask(task)
+  }
+}
+
+async function autoSaveTask(task: any) {
+  try {
+    task.updatedAt = new Date().toISOString()
+    const taskToSave = main.WorkflowTask.createFrom(task)
+    await SaveWorkflowTask(taskToSave)
+    console.log('[WorkflowDrawer] ✓ 自动保存成功')
+  } catch (error: any) {
+    console.error('[WorkflowDrawer] 自动保存失败:', error)
   }
 }
 
@@ -207,18 +234,60 @@ function onSaveNodeData(data: Record<string, any>) {
 }
 
 // 加载任务
-function loadTasks() {
-  const stored = localStorage.getItem('workflow-tasks')
-  if (stored) {
-    try {
-      tasks.value = JSON.parse(stored)
-    } catch (e) {
-      console.error('加载任务失败:', e)
-    }
+async function loadTasks() {
+  try {
+    const loadedTasks = await GetAllWorkflowTasks()
+    tasks.value = loadedTasks || []
+    console.log('[WorkflowDrawer] 加载了', tasks.value.length, '个任务')
+  } catch (error: any) {
+    console.error('[WorkflowDrawer] 加载任务失败:', error)
+    toast.error('加载任务失败: ' + error.message)
   }
 }
 
-loadTasks()
+onMounted(async () => {
+  loadTasks()
+  await checkWebSocketStatus()
+})
+
+async function checkWebSocketStatus() {
+  try {
+    wsRunning.value = await IsWebSocketRunning()
+    if (wsRunning.value) {
+      wsPort.value = await GetWebSocketPort()
+    }
+  } catch (error) {
+    console.error('[WorkflowDrawer] 检查 WebSocket 状态失败:', error)
+  }
+}
+
+async function toggleWebSocket() {
+  try {
+    if (wsRunning.value) {
+      await StopWebSocketServer()
+      wsRunning.value = false
+      wsPort.value = 0
+      toast.success('WebSocket 已停止')
+    } else {
+      await StartWebSocketServer()
+      wsRunning.value = true
+      wsPort.value = await GetWebSocketPort()
+      toast.success(`WebSocket 已启动 (端口: ${wsPort.value})`)
+    }
+  } catch (error: any) {
+    console.error('[WorkflowDrawer] WebSocket 操作失败:', error)
+    toast.error('WebSocket 操作失败: ' + error.message)
+  }
+}
+
+async function copyPort() {
+  try {
+    await navigator.clipboard.writeText(wsPort.value.toString())
+    toast.success('端口号已复制: ' + wsPort.value)
+  } catch (error) {
+    toast.error('复制失败')
+  }
+}
 </script>
 
 <style scoped>
@@ -264,6 +333,60 @@ loadTasks()
   margin: 0;
   font-size: 16px;
   color: #333;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ws-btn {
+  padding: 6px 12px;
+  border: 1px solid #d9d9d9;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.ws-btn.success {
+  background: #52c41a;
+  color: white;
+  border-color: #52c41a;
+}
+
+.ws-btn.success:hover {
+  background: #73d13d;
+}
+
+.ws-btn.danger {
+  background: #ff4d4f;
+  color: white;
+  border-color: #ff4d4f;
+}
+
+.ws-btn.danger:hover {
+  background: #ff7875;
+}
+
+.ws-port {
+  padding: 4px 12px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: monospace;
+  color: #52c41a;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s;
+}
+
+.ws-port:hover {
+  background: #e6f7ff;
+  color: #1890ff;
 }
 
 .close-icon {
