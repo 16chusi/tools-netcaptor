@@ -10,6 +10,7 @@ export const NODE_CONFIGS: NodeConfig[] = [
   { type: 'intercept', label: '拦截请求', icon: '🔧', color: '#87e8de', description: '拦截请求' },
   { type: 'download', label: '下载保存', icon: '💾', color: '#b7eb8f', description: '下载文件' },
   { type: 'extract', label: '提取数据', icon: '📋', color: '#adc6ff', description: '提取数据' },
+  { type: 'scroll', label: '滚动页面', icon: '📜', color: '#ffd666', description: '滚动页面' },
   { type: 'if', label: '条件判断', icon: '❓', color: '#ffc069', description: '条件分支' },
   { type: 'for', label: '循环', icon: '🔄', color: '#ffadd2', description: '循环执行' }
 ]

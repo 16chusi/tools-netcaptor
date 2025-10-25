@@ -2,10 +2,16 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -241,6 +247,9 @@ func (we *WorkflowExecutor) nodeToStep(node *WorkflowNode) ExecutionStep {
 
 // executeStep 执行单个步骤
 func (we *WorkflowExecutor) executeStep(step ExecutionStep) (ExecutionResult, error) {
+	// 替换参数中的变量
+	we.replaceVariables(&step)
+
 	switch step.Action {
 	case "navigate":
 		return we.executeNavigate(step)
@@ -250,6 +259,12 @@ func (we *WorkflowExecutor) executeStep(step ExecutionStep) (ExecutionResult, er
 		return we.executeInput(step)
 	case "wait":
 		return we.executeWait(step)
+	case "extract":
+		return we.executeExtract(step)
+	case "download":
+		return we.executeDownload(step)
+	case "scroll":
+		return we.executeScroll(step)
 	default:
 		return ExecutionResult{Success: false}, fmt.Errorf("未知的操作类型: %s", step.Action)
 	}
@@ -287,7 +302,7 @@ func (we *WorkflowExecutor) executeNavigate(step ExecutionStep) (ExecutionResult
 		Data: map[string]interface{}{"url": url},
 	}
 
-	return we.sendAndWait(msg, 15*time.Second)
+	return we.sendAndWait(msg, 15*time.Second, "navigate")
 }
 
 // executeClick 执行点击
@@ -297,12 +312,20 @@ func (we *WorkflowExecutor) executeClick(step ExecutionStep) (ExecutionResult, e
 		return ExecutionResult{Success: false}, fmt.Errorf("缺少 selector 参数")
 	}
 
-	msg := WSMessage{
-		Type: "click_element",
-		Data: map[string]interface{}{"selector": selector},
+	selectorType := "css"
+	if st, ok := step.Params["selectorType"].(string); ok && st != "" {
+		selectorType = st
 	}
 
-	return we.sendAndWait(msg, 10*time.Second)
+	msg := WSMessage{
+		Type: "click_element",
+		Data: map[string]interface{}{
+			"selector":     selector,
+			"selectorType": selectorType,
+		},
+	}
+
+	return we.sendAndWait(msg, 10*time.Second, "click_element")
 }
 
 // executeInput 执行输入
@@ -317,15 +340,21 @@ func (we *WorkflowExecutor) executeInput(step ExecutionStep) (ExecutionResult, e
 		return ExecutionResult{Success: false}, fmt.Errorf("缺少 text 参数")
 	}
 
+	selectorType := "css"
+	if st, ok := step.Params["selectorType"].(string); ok && st != "" {
+		selectorType = st
+	}
+
 	msg := WSMessage{
 		Type: "input_text",
 		Data: map[string]interface{}{
-			"selector": selector,
-			"text":     text,
+			"selector":     selector,
+			"text":         text,
+			"selectorType": selectorType,
 		},
 	}
 
-	return we.sendAndWait(msg, 10*time.Second)
+	return we.sendAndWait(msg, 10*time.Second, "input_text")
 }
 
 // executeWait 执行等待
@@ -343,45 +372,253 @@ func (we *WorkflowExecutor) executeWait(step ExecutionStep) (ExecutionResult, er
 	}, nil
 }
 
-// sendAndWait 发送消息并等待响应
-func (we *WorkflowExecutor) sendAndWait(msg WSMessage, timeout time.Duration) (ExecutionResult, error) {
-	// 检查 WebSocket 连接
-	if !we.wsServer.IsRunning() {
-		log.Printf("[Workflow] ❌ WebSocket 服务器未运行")
-		return ExecutionResult{Success: false}, fmt.Errorf("WebSocket 服务器未运行，请确保浏览器扩展已连接")
+// executeExtract 执行数据提取
+func (we *WorkflowExecutor) executeExtract(step ExecutionStep) (ExecutionResult, error) {
+	log.Printf("[Workflow] ========== executeExtract 开始 ==========")
+
+	selector, _ := step.Params["selector"].(string)
+	attribute, _ := step.Params["attribute"].(string)
+	saveToVariable, _ := step.Params["saveToVariable"].(string)
+
+	log.Printf("[Workflow] selector: %s", selector)
+	log.Printf("[Workflow] attribute: %s", attribute)
+	log.Printf("[Workflow] saveToVariable: %s", saveToVariable)
+
+	if selector == "" {
+		return ExecutionResult{Success: false}, fmt.Errorf("缺少 selector 参数")
 	}
 
-	if !we.wsServer.HasClients() {
-		log.Printf("[Workflow] ❌ 没有 WebSocket 客户端连接")
-		return ExecutionResult{Success: false}, fmt.Errorf("没有浏览器扩展连接，请先安装并启用扩展")
+	selectorType := "css"
+	if st, ok := step.Params["selectorType"].(string); ok && st != "" {
+		selectorType = st
 	}
 
-	log.Printf("[Workflow] 发送消息: %s, 数据: %+v", msg.Type, msg.Data)
+	msg := WSMessage{
+		Type: "extract_data",
+		Data: map[string]interface{}{
+			"selector":     selector,
+			"attribute":    attribute,
+			"selectorType": selectorType,
+		},
+	}
 
-	// 发送消息
-	we.wsServer.Broadcast(msg)
-	log.Printf("[Workflow] 消息已广播，等待响应 (超时: %v)...", timeout)
+	result, err := we.sendAndWait(msg, 10*time.Second, "extract")
 
-	// 等待响应
-	select {
-	case response := <-we.responseCh:
-		log.Printf("[Workflow] 收到响应: %s, 数据: %+v", response.Type, response.Data)
-		if response.Type == "action_result" {
-			if success, ok := response.Data["success"].(bool); ok && success {
-				return ExecutionResult{Success: true, Message: "执行成功"}, nil
-			}
-			errMsg := "执行失败"
-			if err, ok := response.Data["error"].(string); ok {
-				errMsg = err
-			}
-			return ExecutionResult{Success: false, Error: errMsg}, fmt.Errorf(errMsg)
+	log.Printf("[Workflow] 提取结果: success=%v, err=%v", result.Success, err)
+	log.Printf("[Workflow] 结果数据: %+v", result.Data)
+
+	if err == nil && result.Success && saveToVariable != "" {
+		// 保存到变量
+		if data, ok := result.Data["value"]; ok {
+			we.variables[saveToVariable] = data
+			log.Printf("[Workflow] ✓ 变量已保存: %s = %v (type: %T)", saveToVariable, data, data)
+		} else {
+			log.Printf("[Workflow] ❌ result.Data 中没有 'value' 字段")
 		}
-	case <-time.After(timeout):
-		log.Printf("[Workflow] ❌ 执行超时 (等待了 %v)，浏览器扩展可能未响应", timeout)
-		return ExecutionResult{Success: false}, fmt.Errorf("执行超时：浏览器扩展未在 %v 内响应，请检查扩展是否正常工作", timeout)
 	}
 
-	return ExecutionResult{Success: false}, fmt.Errorf("未收到响应")
+	log.Printf("[Workflow] 当前所有变量: %+v", we.variables)
+
+	return result, err
+}
+
+// executeScroll 执行滚动
+func (we *WorkflowExecutor) executeScroll(step ExecutionStep) (ExecutionResult, error) {
+	scrollType, _ := step.Params["scrollType"].(string)
+	if scrollType == "" {
+		scrollType = "bottom"
+	}
+
+	interval := 500
+	if i, ok := step.Params["interval"].(float64); ok {
+		interval = int(i)
+	}
+
+	msg := WSMessage{
+		Type: "scroll_page",
+		Data: map[string]interface{}{
+			"scrollType": scrollType,
+			"interval":   interval,
+		},
+	}
+
+	if scrollType == "times" {
+		if times, ok := step.Params["times"].(float64); ok {
+			msg.Data["times"] = int(times)
+		}
+	} else if scrollType == "distance" {
+		if distance, ok := step.Params["distance"].(float64); ok {
+			msg.Data["distance"] = int(distance)
+		}
+	}
+
+	return we.sendAndWait(msg, 30*time.Second, "scroll_page")
+}
+
+// executeDownload 执行下载
+func (we *WorkflowExecutor) executeDownload(step ExecutionStep) (ExecutionResult, error) {
+	urlSource, _ := step.Params["urlSource"].(string)
+	saveDirectory, _ := step.Params["saveDirectory"].(string)
+
+	// 获取 URL
+	var urls []string
+	switch urlSource {
+	case "variable":
+		urlVariable, _ := step.Params["urlVariable"].(string)
+		if val, ok := we.variables[urlVariable]; ok {
+			if arr, isArray := val.([]interface{}); isArray {
+				for _, item := range arr {
+					urls = append(urls, fmt.Sprintf("%v", item))
+				}
+			} else {
+				urls = []string{fmt.Sprintf("%v", val)}
+			}
+		} else {
+			return ExecutionResult{Success: false}, fmt.Errorf("变量 %s 不存在", urlVariable)
+		}
+	case "template":
+		urlTemplate, _ := step.Params["urlTemplate"].(string)
+		urls = []string{we.replaceVariablesInString(urlTemplate)}
+	default:
+		downloadUrl, _ := step.Params["downloadUrl"].(string)
+		urls = []string{downloadUrl}
+	}
+
+	if len(urls) == 0 {
+		return ExecutionResult{Success: false}, fmt.Errorf("缺少下载 URL")
+	}
+
+	if saveDirectory == "" {
+		return ExecutionResult{Success: false}, fmt.Errorf("请选择保存目录")
+	}
+
+	// 循环下载
+	var downloadedFiles []string
+	for i, url := range urls {
+		if url == "" {
+			continue
+		}
+
+		// 从 URL 提取文件名
+		filename := filepath.Base(url)
+		if idx := strings.Index(filename, "?"); idx > 0 {
+			filename = filename[:idx]
+		}
+		if filename == "" || filename == "/" {
+			filename = fmt.Sprintf("download_%d", i+1)
+		}
+
+		// 生成完整路径
+		savePath := filepath.Join(saveDirectory, filename)
+
+		// 检查文件是否存在，存在则添加 UUID
+		if _, err := os.Stat(savePath); err == nil {
+			ext := filepath.Ext(filename)
+			base := strings.TrimSuffix(filename, ext)
+			uuidStr := uuid.New().String()[:8]
+			filename = fmt.Sprintf("%s_%s%s", base, uuidStr, ext)
+			savePath = filepath.Join(saveDirectory, filename)
+		}
+
+		log.Printf("[Workflow] 下载文件 %d/%d: %s -> %s", i+1, len(urls), url, savePath)
+
+		// 下载文件
+		resp, err := http.Get(url)
+		if err != nil {
+			log.Printf("[Workflow] 下载失败: %v", err)
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			log.Printf("[Workflow] 下载失败: HTTP %d", resp.StatusCode)
+			continue
+		}
+
+		file, err := os.Create(savePath)
+		if err != nil {
+			log.Printf("[Workflow] 创建文件失败: %v", err)
+			continue
+		}
+		defer file.Close()
+
+		_, err = io.Copy(file, resp.Body)
+		if err != nil {
+			log.Printf("[Workflow] 写入文件失败: %v", err)
+			os.Remove(savePath)
+			continue
+		}
+
+		log.Printf("[Workflow] ✓ 下载成功: %s", filename)
+		downloadedFiles = append(downloadedFiles, savePath)
+	}
+
+	if len(downloadedFiles) == 0 {
+		return ExecutionResult{Success: false}, fmt.Errorf("没有文件被下载")
+	}
+
+	return ExecutionResult{
+		Success: true,
+		Message: fmt.Sprintf("下载完成: %d 个文件", len(downloadedFiles)),
+	}, nil
+}
+
+// replaceVariables 替换步骤参数中的变量
+func (we *WorkflowExecutor) replaceVariables(step *ExecutionStep) {
+	for key, value := range step.Params {
+		if strVal, ok := value.(string); ok {
+			step.Params[key] = we.replaceVariablesInString(strVal)
+		}
+	}
+}
+
+// replaceVariablesInString 替换字符串中的变量
+func (we *WorkflowExecutor) replaceVariablesInString(str string) string {
+	for varName, varValue := range we.variables {
+		placeholder := fmt.Sprintf("{%s}", varName)
+		str = strings.ReplaceAll(str, placeholder, fmt.Sprintf("%v", varValue))
+	}
+	return str
+}
+
+// sendAndWait 发送消息并等待响应
+func (we *WorkflowExecutor) sendAndWait(msg WSMessage, timeout time.Duration, expectedAction string) (ExecutionResult, error) {
+	if !we.wsServer.IsRunning() {
+		return ExecutionResult{Success: false}, fmt.Errorf("WebSocket 服务器未运行")
+	}
+	if !we.wsServer.HasClients() {
+		return ExecutionResult{Success: false}, fmt.Errorf("没有浏览器扩展连接")
+	}
+
+	log.Printf("[Workflow] 发送: %s, 期望响应: %s", msg.Type, expectedAction)
+	we.wsServer.Broadcast(msg)
+
+	deadline := time.Now().Add(timeout)
+	for {
+		select {
+		case response := <-we.responseCh:
+			log.Printf("[Workflow] 收到响应: %+v", response.Data)
+			if response.Type == "action_result" {
+				if action, ok := response.Data["action"].(string); ok && action != expectedAction {
+					log.Printf("[Workflow] 忽略不匹配响应: 期望 %s, 实际 %s", expectedAction, action)
+					if time.Now().Before(deadline) {
+						continue
+					}
+					break
+				}
+				if success, ok := response.Data["success"].(bool); ok && success {
+					return ExecutionResult{Success: true, Message: "执行成功", Data: response.Data}, nil
+				}
+				errMsg := "执行失败"
+				if err, ok := response.Data["error"].(string); ok {
+					errMsg = err
+				}
+				return ExecutionResult{Success: false, Error: errMsg}, fmt.Errorf(errMsg)
+			}
+		case <-time.After(time.Until(deadline)):
+			return ExecutionResult{Success: false}, fmt.Errorf("执行超时")
+		}
+	}
 }
 
 // HandleResponse 处理来自插件的响应

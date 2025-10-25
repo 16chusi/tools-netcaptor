@@ -18,6 +18,7 @@
           @select="selectTask"
           @create="createTask"
           @delete="deleteTask"
+          @rename="renameTask"
         />
         <div class="editor-area">
           <div class="canvas-wrapper">
@@ -25,7 +26,6 @@
             <FlowCanvas
               ref="canvasRef"
               :task="currentTask"
-              @clear="clearCanvas"
               @change="onTaskChange"
               @selectNode="onSelectNode"
               @graphReady="onGraphReady"
@@ -145,12 +145,13 @@ async function deleteTask(id: string) {
   }
 }
 
-function clearCanvas() {
-  if (!currentTask.value) return
-  if (confirm('确定清空画布?')) {
-    currentTask.value.nodes = []
-    currentTask.value.edges = []
-  }
+async function renameTask(id: string, name: string) {
+  const task = tasks.value.find(t => t.id === id)
+  if (!task) return
+  
+  task.name = name
+  await autoSaveTask(task)
+  toast.success('重命名成功')
 }
 
 async function onTaskChange(task: any) {

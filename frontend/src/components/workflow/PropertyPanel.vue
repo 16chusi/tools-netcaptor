@@ -8,8 +8,15 @@
       <!-- 点击元素 -->
       <template v-if="nodeType === 'click'">
         <div class="form-item">
+          <label>选择器类型</label>
+          <select v-model="formData.selectorType">
+            <option value="css">CSS 选择器</option>
+            <option value="xpath">XPath</option>
+          </select>
+        </div>
+        <div class="form-item">
           <label>元素选择器</label>
-          <input v-model="formData.selector" placeholder="#id 或 .class" />
+          <input v-model="formData.selector" :placeholder="formData.selectorType === 'xpath' ? '//*[@id=&quot;btn&quot;]' : '#id 或 .class'" />
         </div>
         <div class="form-item">
           <label>等待元素出现(ms)</label>
@@ -20,8 +27,15 @@
       <!-- 输入文本 -->
       <template v-if="nodeType === 'input'">
         <div class="form-item">
+          <label>选择器类型</label>
+          <select v-model="formData.selectorType">
+            <option value="css">CSS 选择器</option>
+            <option value="xpath">XPath</option>
+          </select>
+        </div>
+        <div class="form-item">
           <label>元素选择器</label>
-          <input v-model="formData.selector" placeholder="#username" />
+          <input v-model="formData.selector" :placeholder="formData.selectorType === 'xpath' ? '//*[@id=&quot;username&quot;]' : '#username'" />
         </div>
         <div class="form-item">
           <label>输入内容</label>
@@ -64,20 +78,49 @@
       <!-- 下载保存 -->
       <template v-if="nodeType === 'download'">
         <div class="form-item">
-          <label>下载URL</label>
-          <input v-model="formData.downloadUrl" placeholder="文件URL" />
+          <label>URL来源</label>
+          <select v-model="formData.urlSource">
+            <option value="direct">直接输入</option>
+            <option value="variable">从变量获取</option>
+            <option value="template">模板拼接</option>
+          </select>
         </div>
+        <div class="form-item" v-if="formData.urlSource === 'direct'">
+          <label>下载URL</label>
+          <input v-model="formData.downloadUrl" placeholder="https://example.com/file.pdf" />
+        </div>
+        <div class="form-item" v-if="formData.urlSource === 'variable'">
+          <label>变量名</label>
+          <input v-model="formData.urlVariable" placeholder="downloadUrl" />
+          <small style="color: #999; font-size: 11px;">直接输入变量名</small>
+        </div>
+        <div class="form-item" v-if="formData.urlSource === 'template'">
+          <label>URL模板</label>
+          <input v-model="formData.urlTemplate" placeholder="https://example.com/{id}/file.pdf" />
+          <small style="color: #999; font-size: 11px;">使用 {变量名} 引用变量</small>
+        </div>
+
         <div class="form-item">
-          <label>保存文件名</label>
-          <input v-model="formData.filename" placeholder="file.txt" />
+          <label>保存目录</label>
+          <div style="display: flex; gap: 8px;">
+            <input v-model="formData.saveDirectory" placeholder="选择保存目录" readonly style="flex: 1;" />
+            <button @click="selectDirectory" type="button" style="padding: 8px 12px; border: 1px solid #d9d9d9; background: white; border-radius: 4px; cursor: pointer;">选择</button>
+          </div>
         </div>
       </template>
 
       <!-- 提取数据 -->
       <template v-if="nodeType === 'extract'">
         <div class="form-item">
+          <label>选择器类型</label>
+          <select v-model="formData.selectorType">
+            <option value="css">CSS 选择器</option>
+            <option value="xpath">XPath</option>
+          </select>
+        </div>
+        <div class="form-item">
           <label>元素选择器</label>
-          <input v-model="formData.selector" placeholder=".item" />
+          <input v-model="formData.selector" :placeholder="formData.selectorType === 'xpath' ? '//*[@class=&quot;item&quot;]' : '.item'" />
         </div>
         <div class="form-item">
           <label>提取属性</label>
@@ -90,7 +133,8 @@
         </div>
         <div class="form-item">
           <label>保存到变量</label>
-          <input v-model="formData.variable" placeholder="myData" />
+          <input v-model="formData.saveToVariable" placeholder="myData" />
+          <small style="color: #999; font-size: 11px;">后续节点可通过 {myData} 引用</small>
         </div>
       </template>
 
@@ -99,6 +143,30 @@
         <div class="form-item">
           <label>条件表达式</label>
           <input v-model="formData.condition" placeholder="变量 == 值" />
+        </div>
+      </template>
+
+      <!-- 滚动页面 -->
+      <template v-if="nodeType === 'scroll'">
+        <div class="form-item">
+          <label>滚动类型</label>
+          <select v-model="formData.scrollType">
+            <option value="bottom">滚动到底部</option>
+            <option value="times">滚动N次</option>
+            <option value="distance">滚动指定距离</option>
+          </select>
+        </div>
+        <div class="form-item" v-if="formData.scrollType === 'times'">
+          <label>滚动次数</label>
+          <input v-model.number="formData.times" type="number" placeholder="5" />
+        </div>
+        <div class="form-item" v-if="formData.scrollType === 'distance'">
+          <label>滚动距离(px)</label>
+          <input v-model.number="formData.distance" type="number" placeholder="1000" />
+        </div>
+        <div class="form-item">
+          <label>每次间隔(ms)</label>
+          <input v-model.number="formData.interval" type="number" placeholder="500" />
         </div>
       </template>
 
@@ -123,6 +191,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { SelectDownloadDirectory } from '../../../wailsjs/go/main/NetworkApp'
 
 const props = defineProps<{
   visible: boolean
@@ -142,11 +211,33 @@ watch(() => props.nodeData, (newData) => {
   console.log('[PropertyPanel] watch nodeData 变化:', newData)
   if (newData) {
     formData.value = { ...newData }
+    // 默认值
+    if (!formData.value.selectorType) {
+      formData.value.selectorType = 'css'
+    }
+    if (!formData.value.urlSource) {
+      formData.value.urlSource = 'direct'
+    }
+    if (!formData.value.scrollType) {
+      formData.value.scrollType = 'bottom'
+    }
+
   } else {
-    formData.value = {}
+    formData.value = { selectorType: 'css', urlSource: 'direct' }
   }
   console.log('[PropertyPanel] formData 已更新:', formData.value)
 }, { immediate: true, deep: true })
+
+async function selectDirectory() {
+  try {
+    const dir = await SelectDownloadDirectory()
+    if (dir) {
+      formData.value.saveDirectory = dir
+    }
+  } catch (error: any) {
+    console.error('[PropertyPanel] 选择目录失败:', error)
+  }
+}
 
 function handleSave() {
   console.log('[PropertyPanel] 保存节点数据:', props.nodeType, formData.value)

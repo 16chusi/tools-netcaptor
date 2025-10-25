@@ -5,7 +5,6 @@
         {{ isRunning ? '⏸️ 运行中...' : '▶️ 运行' }}
       </button>
       <button v-if="isRunning" @click="handleStop" class="toolbar-btn danger">⏹️ 停止</button>
-      <button @click="$emit('clear')" class="toolbar-btn">🧹 清空</button>
       <div v-if="executionStatus" class="status-info">
         <span>{{ executionStatus.currentStep }}/{{ executionStatus.totalSteps }}</span>
         <span :class="'status-' + executionStatus.status">{{ getStatusText(executionStatus.status) }}</span>
@@ -33,7 +32,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   run: []
-  clear: []
   change: [task: any]
   selectNode: [node: any]
   graphReady: [graph: Graph]

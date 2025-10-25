@@ -12,7 +12,17 @@
         @click="$emit('select', task.id)"
       >
         <div class="task-info">
-          <div class="task-name">{{ task.name }}</div>
+          <input 
+            v-if="editingTaskId === task.id"
+            v-model="editingName"
+            @click.stop
+            @blur="saveTaskName(task)"
+            @keyup.enter="saveTaskName(task)"
+            @keyup.esc="cancelEdit"
+            class="task-name-input"
+            ref="nameInput"
+          />
+          <div v-else class="task-name" @dblclick.stop="startEdit(task)" title="双击编辑">{{ task.name }}</div>
           <div class="task-meta">{{ formatDate(task.updatedAt) }}</div>
         </div>
         <button @click.stop="$emit('delete', task.id)" class="delete-btn" title="删除任务">×</button>
@@ -25,6 +35,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref, nextTick } from 'vue'
 import type { WorkflowTask } from '../../types/workflow'
 
 defineProps<{
@@ -32,14 +43,38 @@ defineProps<{
   selectedTaskId?: string
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   select: [id: string]
   create: []
   delete: [id: string]
+  rename: [id: string, name: string]
 }>()
+
+const editingTaskId = ref<string>()
+const editingName = ref('')
+const nameInput = ref<HTMLInputElement>()
 
 function formatDate(date: string) {
   return new Date(date).toLocaleString('zh-CN')
+}
+
+async function startEdit(task: WorkflowTask) {
+  editingTaskId.value = task.id
+  editingName.value = task.name
+  await nextTick()
+  nameInput.value?.focus()
+  nameInput.value?.select()
+}
+
+function saveTaskName(task: WorkflowTask) {
+  if (editingName.value.trim() && editingName.value !== task.name) {
+    emit('rename', task.id, editingName.value.trim())
+  }
+  editingTaskId.value = undefined
+}
+
+function cancelEdit() {
+  editingTaskId.value = undefined
 }
 </script>
 
@@ -117,6 +152,18 @@ function formatDate(date: string) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: text;
+}
+
+.task-name-input {
+  width: 100%;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 4px;
+  padding: 2px 4px;
+  border: 1px solid #1890ff;
+  border-radius: 2px;
+  outline: none;
 }
 
 .delete-btn {
