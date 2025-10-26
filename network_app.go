@@ -355,6 +355,16 @@ func (na *NetworkApp) GetWebhookPort() int {
 	return na.webhookServer.GetPort()
 }
 
+// 设置历史记录最大数量
+func (na *NetworkApp) SetMaxHistoryEntries(max int) {
+	na.capture.SetMaxEntries(max)
+}
+
+// 获取历史记录最大数量
+func (na *NetworkApp) GetMaxHistoryEntries() int {
+	return na.capture.GetMaxEntries()
+}
+
 // 导出到文件
 func ExportToFile(ctx context.Context, data string) error {
 	// 弹出保存对话框

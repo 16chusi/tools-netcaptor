@@ -561,6 +561,7 @@ async function handleRun() {
     // 使用 Wails 生成的类型构造函数
     const task = main.WorkflowTask.createFrom(props.task)
     console.log('[FlowCanvas] 转换后的任务:', task)
+    console.log('[FlowCanvas] 任务ID:', task.id)
     
     await ExecuteWorkflow(task)
   } catch (error: any) {

@@ -45,6 +45,20 @@
         </div>
         
         <div class="setting-item">
+          <label>历史记录数量</label>
+          <input 
+            v-model.number="maxHistoryEntries" 
+            @change="updateMaxHistory"
+            type="number" 
+            class="setting-input" 
+            min="10"
+            max="1000"
+            step="10"
+          />
+          <small>保存最近的 N 条记录，默认100，范围10-1000）</small>
+        </div>
+        
+        <div class="setting-item">
           <label>Webhook 服务</label>
           <div style="display: flex; gap: 8px; align-items: center;">
             <div class="info-box" style="flex: 1;">
@@ -62,6 +76,9 @@
 </template>
 
 <script setup lang="ts">
+import { ref, watch } from 'vue'
+import {GetMaxHistoryEntries, SetMaxHistoryEntries} from "../../wailsjs/go/main/NetworkApp";
+
 const props = defineProps<{
   visible: boolean
   proxyPort: number
@@ -74,6 +91,30 @@ const props = defineProps<{
   webhookPort?: number
   webhookRunning?: boolean
 }>()
+
+const maxHistoryEntries = ref(100)
+
+// 加载当前设置
+watch(() => props.visible, async (visible) => {
+  if (visible) {
+    try {
+      maxHistoryEntries.value = await GetMaxHistoryEntries()
+    } catch (e) {
+      console.error('获取历史记录数量失败:', e)
+    }
+  }
+})
+
+async function updateMaxHistory() {
+  try {
+    await SetMaxHistoryEntries(maxHistoryEntries.value)
+    console.log('历史记录数量已更新:', maxHistoryEntries.value)
+  } catch (e) {
+    console.error('设置历史记录数量失败:', e)
+    alert('设置失败: ' + e)
+  }
+}
+
 
 const emit = defineEmits<{
   close: []

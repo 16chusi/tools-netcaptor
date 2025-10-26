@@ -15,10 +15,12 @@
         <TaskList
           :tasks="tasks"
           :selectedTaskId="selectedTaskId"
+          :runningTaskId="runningTaskId"
           @select="selectTask"
           @create="createTask"
           @delete="deleteTask"
           @rename="renameTask"
+          @stop="stopWorkflow"
         />
         <div class="editor-area">
           <div class="canvas-wrapper">
@@ -53,7 +55,8 @@ import StencilPanel from './workflow/StencilPanel.vue'
 import FlowCanvas from './workflow/FlowCanvas.vue'
 import PropertyPanel from './workflow/PropertyPanel.vue'
 import { toast } from '../utils/toast'
-import { SaveWorkflowTask, GetAllWorkflowTasks, DeleteWorkflowTask, StartWebSocketServer, StopWebSocketServer, GetWebSocketPort, IsWebSocketRunning } from '../../wailsjs/go/main/NetworkApp'
+import { SaveWorkflowTask, GetAllWorkflowTasks, DeleteWorkflowTask, StartWebSocketServer, StopWebSocketServer, GetWebSocketPort, IsWebSocketRunning, IsWorkflowRunning, StopWorkflow } from '../../wailsjs/go/main/NetworkApp'
+import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
 import { main } from '../../wailsjs/go/models'
 
 interface WorkflowTask {
@@ -76,6 +79,7 @@ const emit = defineEmits<{
 
 const wsRunning = ref(false)
 const wsPort = ref(0)
+const runningTaskId = ref<string>()
 
 const tasks = ref<WorkflowTask[]>([])
 const selectedTaskId = ref<string>()
@@ -246,10 +250,47 @@ async function loadTasks() {
   }
 }
 
+watch(() => props.visible, async (visible) => {
+  if (visible) {
+    await checkWorkflowStatus()
+  }
+})
+
 onMounted(async () => {
   loadTasks()
   await checkWebSocketStatus()
+  await checkWorkflowStatus()
+  
+  EventsOn('workflow_status', (status: any) => {
+    if (status.status === 'running') {
+      runningTaskId.value = status.taskID
+    } else if (status.status === 'success' || status.status === 'failed' || status.status === 'stopped') {
+      runningTaskId.value = undefined
+    }
+  })
 })
+
+async function checkWorkflowStatus() {
+  try {
+    const isRunning = await IsWorkflowRunning()
+    if (!isRunning) {
+      runningTaskId.value = undefined
+    }
+  } catch (error) {
+    console.error('[WorkflowDrawer] 检查工作流状态失败:', error)
+  }
+}
+
+async function stopWorkflow() {
+  try {
+    await StopWorkflow()
+    runningTaskId.value = undefined
+    toast.success('工作流已停止')
+  } catch (error: any) {
+    console.error('[WorkflowDrawer] 停止工作流失败:', error)
+    toast.error('停止失败: ' + error.message)
+  }
+}
 
 async function checkWebSocketStatus() {
   try {

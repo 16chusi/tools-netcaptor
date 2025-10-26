@@ -48,18 +48,20 @@ type NetworkEntry struct {
 }
 
 type NetworkCapture struct {
-	ctx       context.Context
-	requests  []NetworkRequest
-	responses []NetworkResponse
-	entries   []NetworkEntry
-	mu        sync.RWMutex
+	ctx        context.Context
+	requests   []NetworkRequest
+	responses  []NetworkResponse
+	entries    []NetworkEntry
+	mu         sync.RWMutex
+	maxEntries int
 }
 
 func NewNetworkCapture() *NetworkCapture {
 	return &NetworkCapture{
-		requests:  make([]NetworkRequest, 0),
-		responses: make([]NetworkResponse, 0),
-		entries:   make([]NetworkEntry, 0),
+		requests:   make([]NetworkRequest, 0),
+		responses:  make([]NetworkResponse, 0),
+		entries:    make([]NetworkEntry, 0),
+		maxEntries: 100, // 默认保存100条
 	}
 }
 
@@ -122,7 +124,35 @@ func (nc *NetworkCapture) GetEntries() []NetworkEntry {
 func (nc *NetworkCapture) AddEntry(entry NetworkEntry) {
 	nc.mu.Lock()
 	nc.entries = append(nc.entries, entry)
+
+	// 限制历史记录数量
+	if len(nc.entries) > nc.maxEntries {
+		nc.entries = nc.entries[len(nc.entries)-nc.maxEntries:]
+	}
 	nc.mu.Unlock()
+}
+
+func (nc *NetworkCapture) SetMaxEntries(max int) {
+	nc.mu.Lock()
+	if max < 10 {
+		max = 10
+	}
+	if max > 1000 {
+		max = 1000
+	}
+	nc.maxEntries = max
+
+	// 如果当前记录超过新限制，裁剪
+	if len(nc.entries) > nc.maxEntries {
+		nc.entries = nc.entries[len(nc.entries)-nc.maxEntries:]
+	}
+	nc.mu.Unlock()
+}
+
+func (nc *NetworkCapture) GetMaxEntries() int {
+	nc.mu.RLock()
+	defer nc.mu.RUnlock()
+	return nc.maxEntries
 }
 
 func (nc *NetworkCapture) GetInjectionScript() string {
