@@ -7,18 +7,6 @@
       </div>
       <div class="drawer-content">
         <div class="setting-item">
-          <label>WebSocket 服务</label>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <div class="info-box" style="flex: 1;">
-              <span class="port-value">{{ wsRunning ? wsPort : '未启动' }}</span>
-            </div>
-            <button v-if="!wsRunning" @click="$emit('startWebSocket')" class="ws-btn ws-btn-start">启动</button>
-            <button v-else @click="$emit('stopWebSocket')" class="ws-btn ws-btn-stop">停止</button>
-          </div>
-          <small>浏览器插件连接端口（随机分配 10000-19999）</small>
-        </div>
-        
-        <div class="setting-item">
           <label>代理端口</label>
           <input 
             :value="proxyPort" 
@@ -55,13 +43,26 @@
           </div>
           <small>留空使用系统默认下载目录</small>
         </div>
+        
+        <div class="setting-item">
+          <label>Webhook 服务</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <div class="info-box" style="flex: 1;">
+              <span class="port-value">{{ webhookRunning ? webhookPort : '未启动' }}</span>
+            </div>
+            <button v-if="webhookRunning" @click="copyWebhookUrl" class="ws-btn ws-btn-copy">复制</button>
+            <button v-if="!webhookRunning" @click="$emit('startWebhook')" class="ws-btn ws-btn-start">启动</button>
+            <button v-else @click="$emit('stopWebhook')" class="ws-btn ws-btn-stop">停止</button>
+          </div>
+          <small>HTTP接口 + 测试页面（随机端口）</small>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   visible: boolean
   proxyPort: number
   proxyRunning: boolean
@@ -70,9 +71,11 @@ defineProps<{
   downloadPath: string
   wsPort?: number
   wsRunning?: boolean
+  webhookPort?: number
+  webhookRunning?: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   close: []
   'update:proxyPort': [value: number]
   'update:selectedBrowser': [value: string]
@@ -80,7 +83,18 @@ defineEmits<{
   selectPath: []
   startWebSocket: []
   stopWebSocket: []
+  startWebhook: []
+  stopWebhook: []
 }>()
+
+function copyWebhookUrl() {
+  if (props.webhookPort) {
+    const url = `http://127.0.0.1:${props.webhookPort}/webhook`
+    navigator.clipboard.writeText(url).then(() => {
+      alert('已复制: ' + url)
+    })
+  }
+}
 </script>
 
 <style scoped>
@@ -263,5 +277,14 @@ defineEmits<{
 
 .ws-btn-stop:hover {
   background: #b71c1c;
+}
+
+.ws-btn-copy {
+  background: #34a853;
+  color: white;
+}
+
+.ws-btn-copy:hover {
+  background: #2d8e47;
 }
 </style>

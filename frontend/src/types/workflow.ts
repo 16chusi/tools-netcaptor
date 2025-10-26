@@ -30,12 +30,14 @@ export type NodeType =
   | 'click'
   | 'input'
   | 'wait'
-  | 'intercept'
   | 'download'
   | 'extract'
   | 'if'
   | 'for'
   | 'navigate'
+  | 'scroll'
+  | 'jsonl_reader'
+  | 'intercept_request'
 
 export interface NodeConfig {
   type: NodeType

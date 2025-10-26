@@ -52,10 +52,14 @@
         :proxyRunning="proxyRunning"
         :wsPort="wsPort"
         :wsRunning="wsRunning"
+        :webhookPort="webhookPort"
+        :webhookRunning="webhookRunning"
         @close="settingsVisible = false"
         @selectPath="selectDownloadPath"
         @startWebSocket="startWebSocket"
         @stopWebSocket="stopWebSocket"
+        @startWebhook="startWebhook"
+        @stopWebhook="stopWebhook"
     />
 
     <CertDrawer
@@ -97,7 +101,7 @@
         <div
             v-for="entry in filteredEntries"
             :key="entry.id"
-            :class="['table-row', {selected: selectedEntry?.id === entry.id}]"
+            :class="['table-row', {selected: selectedEntry === entry}]"
             @click="selectEntry(entry)"
         >
           <div class="col-name">
@@ -204,8 +208,10 @@ import {
   GetCACertPath,
   GetProxyURL,
   GetWebSocketPort,
+  GetWebhookPort,
   IsProxyRunning,
   IsWebSocketRunning,
+  IsWebhookRunning,
   OpenInChrome,
   OpenInEdge,
   OpenInFirefox,
@@ -213,8 +219,10 @@ import {
   SetInterceptRules,
   StartProxyWithPort,
   StartWebSocketServer,
+  StartWebhookServer,
   StopProxy,
-  StopWebSocketServer
+  StopWebSocketServer,
+  StopWebhookServer
 } from '../../wailsjs/go/main/NetworkApp'
 import {BrowserOpenURL} from '../../wailsjs/runtime/runtime'
 import {ShowErrorDialog, ShowInfoDialog, ShowQuestionDialog} from '../../wailsjs/go/main/NetworkApp'
@@ -260,6 +268,8 @@ const interceptRules = ref<InterceptRule[]>([])
 const editingRule = ref<InterceptRule | undefined>(undefined)
 const wsPort = ref<number>()
 const wsRunning = ref(false)
+const webhookPort = ref<number>()
+const webhookRunning = ref(false)
 const workflowVisible = ref(false)
 let refreshInterval: any = null
 
@@ -318,6 +328,16 @@ onMounted(async () => {
     console.error('Failed to get WebSocket status:', e)
   }
   
+  // 获取 Webhook 状态
+  try {
+    webhookRunning.value = await IsWebhookRunning()
+    if (webhookRunning.value) {
+      webhookPort.value = await GetWebhookPort()
+    }
+  } catch (e) {
+    console.error('Failed to get Webhook status:', e)
+  }
+  
   refreshInterval = setInterval(refreshData, 500)
 })
 
@@ -349,6 +369,8 @@ async function clearAll() {
   await ClearCapture()
   entries.value = []
   selectedEntry.value = null
+  filterText.value = ''
+  filterType.value = 'all'
 }
 
 async function openBrowser() {
@@ -372,12 +394,10 @@ async function openBrowser() {
 }
 
 async function getTestPort() {
-  try {
-    const {GetTestServerPort} = await import('../../wailsjs/go/main/App')
-    return await GetTestServerPort()
-  } catch {
-    return 9999
+  if (webhookRunning.value && webhookPort.value) {
+    return webhookPort.value
   }
+  return 9999
 }
 
 async function selectDownloadPath() {
@@ -691,6 +711,28 @@ async function stopWebSocket() {
     wsRunning.value = false
     wsPort.value = undefined
     ShowInfoDialog('成功', 'WebSocket 服务器已停止')
+  } catch (e: any) {
+    ShowErrorDialog('错误', `停止失败: ${e}`)
+  }
+}
+
+async function startWebhook() {
+  try {
+    await StartWebhookServer()
+    webhookRunning.value = true
+    webhookPort.value = await GetWebhookPort()
+    ShowInfoDialog('成功', `Webhook 服务器已启动，端口: ${webhookPort.value}`)
+  } catch (e: any) {
+    ShowErrorDialog('错误', `启动失败: ${e}`)
+  }
+}
+
+async function stopWebhook() {
+  try {
+    await StopWebhookServer()
+    webhookRunning.value = false
+    webhookPort.value = undefined
+    ShowInfoDialog('成功', 'Webhook 服务器已停止')
   } catch (e: any) {
     ShowErrorDialog('错误', `停止失败: ${e}`)
   }

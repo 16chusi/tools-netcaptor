@@ -249,5 +249,5 @@ func (nc *NetworkCapture) GetInjectionScript() string {
 }
 
 func generateID() string {
-	return time.Now().Format("20060102150405") + "_" + string(time.Now().UnixNano()%1000)
+	return time.Now().Format("20060102150405") + "_" + time.Now().Format("000")
 }

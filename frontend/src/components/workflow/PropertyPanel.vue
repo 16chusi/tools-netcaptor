@@ -46,8 +46,20 @@
       <!-- 导航 -->
       <template v-if="nodeType === 'navigate'">
         <div class="form-item">
-          <label>目标URL</label>
-          <input v-model="formData.url" placeholder="https://example.com" />
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="margin: 0; min-width: 80px;">目标URL</label>
+            <input v-model="formData.url" placeholder="https://example.com 或 {url}" style="flex: 1;" />
+          </div>
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">支持变量引用，如 {url} 或 {data.url}</small>
+        </div>
+        <div class="form-item">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="margin: 0; min-width: 80px;">打开方式</label>
+            <select v-model="formData.openMode" style="flex: 1;">
+              <option value="current">当前窗口</option>
+              <option value="new">新窗口</option>
+            </select>
+          </div>
         </div>
       </template>
 
@@ -56,22 +68,6 @@
         <div class="form-item">
           <label>等待时间(ms)</label>
           <input v-model.number="formData.duration" type="number" placeholder="1000" />
-        </div>
-      </template>
-
-      <!-- 拦截请求 -->
-      <template v-if="nodeType === 'intercept'">
-        <div class="form-item">
-          <label>URL匹配模式</label>
-          <input v-model="formData.urlPattern" placeholder="/api/*" />
-        </div>
-        <div class="form-item">
-          <label>操作类型</label>
-          <select v-model="formData.actionType">
-            <option value="log">记录日志</option>
-            <option value="save">保存响应</option>
-            <option value="modify">修改响应</option>
-          </select>
         </div>
       </template>
 
@@ -181,6 +177,106 @@
           <input v-model="formData.variable" placeholder="i" />
         </div>
       </template>
+
+      <!-- 拦截请求 -->
+      <template v-if="nodeType === 'intercept_request'">
+        <div class="form-item">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="margin: 0; min-width: 80px;">URL匹配</label>
+            <input v-model="formData.urlPattern" placeholder="*/api/login" style="flex: 1;" />
+          </div>
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">支持通配符 *，如 */api/*</small>
+        </div>
+        <div class="form-item">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="margin: 0; min-width: 80px;">拦截动作</label>
+            <select v-model="formData.action" style="flex: 1;">
+              <option value="block">阻断请求</option>
+              <option value="mock">Mock响应</option>
+              <option value="redirect">重定向</option>
+              <option value="download">下载保存</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-item" v-if="formData.action === 'block'">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="margin: 0; min-width: 80px;">状态码</label>
+            <input v-model.number="formData.statusCode" type="number" placeholder="403" style="flex: 1;" />
+          </div>
+        </div>
+        <div class="form-item" v-if="formData.action === 'mock'">
+          <label>Mock响应内容</label>
+          <textarea v-model="formData.mockResponse" placeholder='{"success":true}' style="width: 100%; min-height: 100px; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; font-family: monospace; font-size: 12px;"></textarea>
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">JSON格式</small>
+        </div>
+        <div class="form-item" v-if="formData.action === 'redirect'">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="margin: 0; min-width: 80px;">重定向URL</label>
+            <input v-model="formData.redirectUrl" placeholder="https://example.com/api" style="flex: 1;" />
+          </div>
+        </div>
+        <div class="form-item" v-if="formData.action === 'download'">
+          <label>保存目录</label>
+          <div style="display: flex; gap: 8px;">
+            <input v-model="formData.saveDirectory" placeholder="选择保存目录" readonly style="flex: 1;" />
+            <button @click="selectDirectory" type="button" style="padding: 8px 12px; border: 1px solid #d9d9d9; background: white; border-radius: 4px; cursor: pointer;">选择</button>
+          </div>
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">拦截的请求将被下载到此目录</small>
+        </div>
+      </template>
+
+      <!-- JSONL读取器 -->
+      <template v-if="nodeType === 'jsonl_reader'">
+        <div class="form-item">
+          <label>JSONL文件</label>
+          <div style="display: flex; gap: 8px;">
+            <input v-model="formData.filePath" placeholder="选择JSONL文件" readonly style="flex: 1;" />
+            <button @click="selectJSONLFile" type="button" style="padding: 8px 12px; border: 1px solid #d9d9d9; background: white; border-radius: 4px; cursor: pointer;">选择</button>
+          </div>
+        </div>
+        <div class="form-item" v-if="formData.filePath">
+          <button @click="loadJSONLKeys" type="button" style="width: 100%; padding: 8px; border: 1px solid #1890ff; background: white; color: #1890ff; border-radius: 4px; cursor: pointer;">加载可用字段</button>
+        </div>
+        <div class="form-item" v-if="availableKeys.length > 0">
+          <label>可用字段</label>
+          <div style="padding: 8px; background: #f5f5f5; border-radius: 4px; font-size: 12px; color: #666;">
+            {{ availableKeys.join(', ') }}
+          </div>
+        </div>
+        <div class="form-item">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="margin: 0; min-width: 80px;">提取字段</label>
+            <input v-model="formData.extractKeys" placeholder="*" style="flex: 1;" />
+          </div>
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">多个字段用逗号分隔，* 表示全部</small>
+        </div>
+        <div class="form-item">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="margin: 0; min-width: 80px;">保存变量</label>
+            <input v-model="formData.saveToVariable" placeholder="data" style="flex: 1;" />
+          </div>
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">后续节点可通过 {data.fieldName} 引用</small>
+        </div>
+        <div class="form-item">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="margin: 0; min-width: 80px;">循环间隔</label>
+            <input v-model.number="formData.interval" type="number" placeholder="100" style="flex: 1;" />
+            <span style="color: #999; font-size: 12px;">ms</span>
+          </div>
+        </div>
+        <div class="form-item">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="margin: 0; min-width: 80px;">最大次数</label>
+            <input v-model.number="formData.maxCount" type="number" :placeholder="totalLines > 0 ? String(totalLines) : '全部'" style="flex: 1;" />
+          </div>
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">留空则处理全部数据</small>
+        </div>
+        <div class="form-item" v-if="formData.filePath && totalLines > 0">
+          <div style="padding: 8px; background: #e6f7ff; border: 1px solid #91d5ff; border-radius: 4px; font-size: 12px; color: #1890ff;">
+            文件共 {{ totalLines }} 行数据
+          </div>
+        </div>
+      </template>
     </div>
     <div class="panel-footer">
       <button @click="handleSave" class="save-btn">保存</button>
@@ -191,7 +287,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { SelectDownloadDirectory } from '../../../wailsjs/go/main/NetworkApp'
+import { SelectDownloadDirectory, SelectJSONLFile, LoadJSONLFile } from '../../../wailsjs/go/main/NetworkApp'
 
 const props = defineProps<{
   visible: boolean
@@ -206,6 +302,8 @@ const emit = defineEmits<{
 }>()
 
 const formData = ref<Record<string, any>>({})
+const availableKeys = ref<string[]>([])
+const totalLines = ref(0)
 
 watch(() => props.nodeData, (newData) => {
   console.log('[PropertyPanel] watch nodeData 变化:', newData)
@@ -221,9 +319,24 @@ watch(() => props.nodeData, (newData) => {
     if (!formData.value.scrollType) {
       formData.value.scrollType = 'bottom'
     }
+    if (!formData.value.openMode) {
+      formData.value.openMode = 'current'
+    }
+    if (!formData.value.extractKeys) {
+      formData.value.extractKeys = '*'
+    }
+    if (!formData.value.interval) {
+      formData.value.interval = 100
+    }
+    if (!formData.value.action) {
+      formData.value.action = 'block'
+    }
+    if (!formData.value.statusCode) {
+      formData.value.statusCode = 403
+    }
 
   } else {
-    formData.value = { selectorType: 'css', urlSource: 'direct' }
+    formData.value = { selectorType: 'css', urlSource: 'direct', extractKeys: '*', interval: 100, openMode: 'current' }
   }
   console.log('[PropertyPanel] formData 已更新:', formData.value)
 }, { immediate: true, deep: true })
@@ -236,6 +349,31 @@ async function selectDirectory() {
     }
   } catch (error: any) {
     console.error('[PropertyPanel] 选择目录失败:', error)
+  }
+}
+
+async function selectJSONLFile() {
+  try {
+    const file = await SelectJSONLFile()
+    if (file) {
+      formData.value.filePath = file
+      availableKeys.value = []
+      totalLines.value = 0
+    }
+  } catch (error: any) {
+    console.error('[PropertyPanel] 选择文件失败:', error)
+  }
+}
+
+async function loadJSONLKeys() {
+  if (!formData.value.filePath) return
+  try {
+    const result = await LoadJSONLFile(formData.value.filePath)
+    availableKeys.value = result.keys || []
+    totalLines.value = result.totalLines || 0
+  } catch (error: any) {
+    console.error('[PropertyPanel] 加载文件失败:', error)
+    alert('加载文件失败: ' + error)
   }
 }
 
@@ -313,6 +451,7 @@ function handleSave() {
   font-size: 12px;
   font-weight: 500;
   color: #333;
+  text-align: left;
 }
 
 .form-item input,
@@ -322,6 +461,7 @@ function handleSave() {
   border: 1px solid #d9d9d9;
   border-radius: 4px;
   font-size: 13px;
+  text-align: left;
 }
 
 .form-item input:focus,

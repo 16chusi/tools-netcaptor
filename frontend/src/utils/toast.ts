@@ -19,11 +19,11 @@ function showToast(message: string, type: 'success' | 'error' | 'warning' | 'inf
     }
   })
 
-  const instance = app.mount(container)
+  const instance = app.mount(container) as any
   currentApp = app
   currentContainer = container
   
-  if (instance && typeof instance.show === 'function') {
+  if (instance?.show) {
     instance.show()
   }
 

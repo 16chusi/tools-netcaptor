@@ -344,7 +344,7 @@ func (a *App) CloseBrowser() error {
 	return nil
 }
 
-// GetTestServerPort 获取测试服务器端口
+// GetTestServerPort 获取测试服务器端口（已废弃，使用 NetworkApp.GetWebhookPort）
 func (a *App) GetTestServerPort() int {
-	return GetTestServerPort()
+	return 0
 }

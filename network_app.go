@@ -17,6 +17,7 @@ type NetworkApp struct {
 	wsServer         *WebSocketServer
 	workflowExecutor *WorkflowExecutor
 	workflowStorage  *WorkflowStorage
+	webhookServer    *WebhookServer
 }
 
 func NewNetworkApp() *NetworkApp {
@@ -28,6 +29,7 @@ func NewNetworkApp() *NetworkApp {
 	}
 	app.wsServer = NewWebSocketServer(app)
 	app.workflowExecutor = NewWorkflowExecutor(app)
+	app.webhookServer = NewWebhookServer()
 
 	// 初始化存储
 	storage, err := NewWorkflowStorage()
@@ -187,6 +189,31 @@ func (na *NetworkApp) SelectDownloadDirectory() (string, error) {
 	return path, err
 }
 
+// 选择JSONL文件
+func (na *NetworkApp) SelectJSONLFile() (string, error) {
+	path, err := runtime.OpenFileDialog(na.ctx, runtime.OpenDialogOptions{
+		Title: "选择JSONL文件",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "JSONL Files (*.jsonl)", Pattern: "*.jsonl"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+	return path, err
+}
+
+// 加载JSONL文件
+func (na *NetworkApp) LoadJSONLFile(filePath string) (map[string]interface{}, error) {
+	reader := NewJSONLReader(filePath)
+	if err := reader.Load(); err != nil {
+		return nil, fmt.Errorf("加载文件失败: %w", err)
+	}
+
+	return map[string]interface{}{
+		"keys":       reader.GetKeys(),
+		"totalLines": reader.GetLineCount(),
+	}, nil
+}
+
 // 获取拦截规则
 func (na *NetworkApp) GetInterceptRules() []InterceptRule {
 	return na.proxy.interceptor.GetRules()
@@ -306,6 +333,26 @@ func (na *NetworkApp) DeleteWorkflowTask(id string) error {
 		return fmt.Errorf("存储未初始化")
 	}
 	return na.workflowStorage.DeleteTask(id)
+}
+
+// 启动 Webhook 服务器
+func (na *NetworkApp) StartWebhookServer() error {
+	return na.webhookServer.Start()
+}
+
+// 停止 Webhook 服务器
+func (na *NetworkApp) StopWebhookServer() error {
+	return na.webhookServer.Stop()
+}
+
+// 获取 Webhook 运行状态
+func (na *NetworkApp) IsWebhookRunning() bool {
+	return na.webhookServer.IsRunning()
+}
+
+// 获取 Webhook 端口
+func (na *NetworkApp) GetWebhookPort() int {
+	return na.webhookServer.GetPort()
 }
 
 // 导出到文件

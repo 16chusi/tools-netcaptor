@@ -59,17 +59,6 @@ func (we *WorkflowExecutor) Execute(task WorkflowTask) error {
 	log.Printf("[Workflow] 节点数量: %d", len(task.Nodes))
 	log.Printf("[Workflow] 边数量: %d", len(task.Edges))
 
-	// 打印所有节点的详细信息
-	for i, node := range task.Nodes {
-		log.Printf("[Workflow] 节点[%d] - ID: %s, Type: %s, Label: %s", i, node.ID, node.Type, node.Label)
-		log.Printf("[Workflow] 节点[%d] - Data: %+v", i, node.Data)
-		if node.Data != nil {
-			for key, value := range node.Data {
-				log.Printf("[Workflow] 节点[%d] - Data[%s] = %v (type: %T)", i, key, value, value)
-			}
-		}
-	}
-
 	// 构建执行计划
 	steps, err := we.buildExecutionPlan(task)
 	if err != nil {
@@ -107,6 +96,24 @@ func (we *WorkflowExecutor) Execute(task WorkflowTask) error {
 			Status:      "running",
 			CurrentNode: step.NodeID,
 		})
+
+		// 处理JSONL读取器的循环逻辑
+		if step.Action == "jsonl_reader" {
+			if err := we.executeJSONLReaderLoop(task, steps, i); err != nil {
+				errMsg := fmt.Sprintf("步骤执行失败: %v", err)
+				log.Printf("[Workflow] %s", errMsg)
+				we.emitStatus(ExecutionStatus{
+					TaskID:       task.ID,
+					CurrentStep:  i + 1,
+					TotalSteps:   len(steps),
+					Status:       "failed",
+					CurrentNode:  step.NodeID,
+					ErrorMessage: errMsg,
+				})
+				return err
+			}
+			break // JSONL读取器处理完成后结束
+		}
 
 		result, err := we.executeStep(step)
 		if err != nil {
@@ -265,6 +272,8 @@ func (we *WorkflowExecutor) executeStep(step ExecutionStep) (ExecutionResult, er
 		return we.executeDownload(step)
 	case "scroll":
 		return we.executeScroll(step)
+	case "intercept_request":
+		return we.executeInterceptRequest(step)
 	default:
 		return ExecutionResult{Success: false}, fmt.Errorf("未知的操作类型: %s", step.Action)
 	}
@@ -297,9 +306,17 @@ func (we *WorkflowExecutor) executeNavigate(step ExecutionStep) (ExecutionResult
 
 	log.Printf("[Workflow] ✓ 执行导航: %s", url)
 
+	openMode := "current"
+	if mode, ok := step.Params["openMode"].(string); ok && mode != "" {
+		openMode = mode
+	}
+
 	msg := WSMessage{
 		Type: "navigate",
-		Data: map[string]interface{}{"url": url},
+		Data: map[string]interface{}{
+			"url":      url,
+			"openMode": openMode,
+		},
 	}
 
 	return we.sendAndWait(msg, 15*time.Second, "navigate")
@@ -574,11 +591,57 @@ func (we *WorkflowExecutor) replaceVariables(step *ExecutionStep) {
 
 // replaceVariablesInString 替换字符串中的变量
 func (we *WorkflowExecutor) replaceVariablesInString(str string) string {
-	for varName, varValue := range we.variables {
-		placeholder := fmt.Sprintf("{%s}", varName)
-		str = strings.ReplaceAll(str, placeholder, fmt.Sprintf("%v", varValue))
+	// 匹配 {varName}, {varName.field}, {varName[key]}
+	for {
+		start := strings.Index(str, "{")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(str[start:], "}")
+		if end == -1 {
+			break
+		}
+		end += start
+
+		placeholder := str[start : end+1]
+		varPath := str[start+1 : end]
+
+		// 解析变量路径
+		value := we.resolveVariablePath(varPath)
+		if value != nil {
+			str = strings.Replace(str, placeholder, fmt.Sprintf("%v", value), 1)
+		} else {
+			str = str[:start] + str[end+1:]
+		}
 	}
 	return str
+}
+
+// resolveVariablePath 解析变量路径 支持 data.url 和 data[url]
+func (we *WorkflowExecutor) resolveVariablePath(path string) interface{} {
+	// 处理 data.field 或 data[field]
+	if strings.Contains(path, ".") {
+		parts := strings.SplitN(path, ".", 2)
+		if val, ok := we.variables[parts[0]]; ok {
+			if mapVal, isMap := val.(map[string]interface{}); isMap {
+				return mapVal[parts[1]]
+			}
+		}
+	} else if strings.Contains(path, "[") && strings.Contains(path, "]") {
+		start := strings.Index(path, "[")
+		end := strings.Index(path, "]")
+		varName := path[:start]
+		key := path[start+1 : end]
+		if val, ok := we.variables[varName]; ok {
+			if mapVal, isMap := val.(map[string]interface{}); isMap {
+				return mapVal[key]
+			}
+		}
+	} else {
+		// 简单变量
+		return we.variables[path]
+	}
+	return nil
 }
 
 // sendAndWait 发送消息并等待响应
@@ -613,7 +676,7 @@ func (we *WorkflowExecutor) sendAndWait(msg WSMessage, timeout time.Duration, ex
 				if err, ok := response.Data["error"].(string); ok {
 					errMsg = err
 				}
-				return ExecutionResult{Success: false, Error: errMsg}, fmt.Errorf(errMsg)
+				return ExecutionResult{Success: false, Error: errMsg}, fmt.Errorf("%s", errMsg)
 			}
 		case <-time.After(time.Until(deadline)):
 			return ExecutionResult{Success: false}, fmt.Errorf("执行超时")
@@ -628,6 +691,156 @@ func (we *WorkflowExecutor) HandleResponse(msg WSMessage) {
 	default:
 		log.Printf("[Workflow] 响应通道已满，丢弃消息")
 	}
+}
+
+// executeJSONLReaderLoop 执行JSONL读取器的循环逻辑
+func (we *WorkflowExecutor) executeJSONLReaderLoop(task WorkflowTask, steps []ExecutionStep, jsonlStepIndex int) error {
+	step := steps[jsonlStepIndex]
+	filePath, _ := step.Params["filePath"].(string)
+	if filePath == "" {
+		return fmt.Errorf("缺少文件路径")
+	}
+
+	extractKeysStr, _ := step.Params["extractKeys"].(string)
+	if extractKeysStr == "" {
+		extractKeysStr = "*"
+	}
+
+	interval := 100
+	if i, ok := step.Params["interval"].(float64); ok {
+		interval = int(i)
+	}
+
+	// 加载文件
+	reader := NewJSONLReader(filePath)
+	if err := reader.Load(); err != nil {
+		return fmt.Errorf("加载文件失败: %w", err)
+	}
+
+	// 解析keys
+	var extractKeys []string
+	if extractKeysStr == "*" {
+		extractKeys = []string{"*"}
+	} else {
+		extractKeys = strings.Split(extractKeysStr, ",")
+		for i := range extractKeys {
+			extractKeys[i] = strings.TrimSpace(extractKeys[i])
+		}
+	}
+
+	totalLines := reader.GetLineCount()
+	if m, ok := step.Params["maxCount"].(float64); ok && int(m) > 0 && int(m) < totalLines {
+		totalLines = int(m)
+	}
+
+	log.Printf("[Workflow] JSONL读取器: 文件=%s, 总行数=%d, 提取字段=%v, 间隔=%dms",
+		filePath, totalLines, extractKeys, interval)
+
+	// 获取JSONL读取器之后的所有步骤
+	loopSteps := steps[jsonlStepIndex+1:]
+
+	// 循环执行每一行
+	for lineIndex := 0; lineIndex < totalLines; lineIndex++ {
+		if we.stopped {
+			return fmt.Errorf("执行已停止")
+		}
+
+		log.Printf("[Workflow] JSONL循环: 第 %d/%d 行", lineIndex+1, totalLines)
+
+		// 读取当前行
+		lineData, err := reader.GetLine(lineIndex)
+		if err != nil {
+			log.Printf("[Workflow] 读取第 %d 行失败: %v", lineIndex+1, err)
+			continue
+		}
+
+		// 提取数据
+		extractedData := reader.ExtractValue(lineData, extractKeys)
+
+		// 将提取的数据保存到变量中
+		saveToVariable, _ := step.Params["saveToVariable"].(string)
+		if saveToVariable != "" {
+			// 保存为嵌套对象
+			we.variables[saveToVariable] = extractedData
+			log.Printf("[Workflow] 变量设置: %s = %v", saveToVariable, extractedData)
+		} else {
+			// 直接保存各个字段
+			for key, value := range extractedData {
+				we.variables[key] = value
+				log.Printf("[Workflow] 变量设置: %s = %v", key, value)
+			}
+		}
+
+		// 执行后续步骤
+		for _, loopStep := range loopSteps {
+			if we.stopped {
+				return fmt.Errorf("执行已停止")
+			}
+
+			log.Printf("[Workflow] 执行循环内步骤: %s", loopStep.Action)
+
+			// 创建步骤副本避免变量污染
+			stepCopy := ExecutionStep{
+				NodeID: loopStep.NodeID,
+				Action: loopStep.Action,
+				Params: make(map[string]interface{}),
+			}
+			for k, v := range loopStep.Params {
+				stepCopy.Params[k] = v
+			}
+
+			_, err := we.executeStep(stepCopy)
+			if err != nil {
+				log.Printf("[Workflow] 循环内步骤执行失败: %v", err)
+				return err
+			}
+		}
+
+		// 等待间隔
+		if interval > 0 && lineIndex < totalLines-1 {
+			time.Sleep(time.Duration(interval) * time.Millisecond)
+		}
+	}
+
+	log.Printf("[Workflow] JSONL循环完成: 共处理 %d 行", totalLines)
+	return nil
+}
+
+// executeInterceptRequest 执行请求拦截
+func (we *WorkflowExecutor) executeInterceptRequest(step ExecutionStep) (ExecutionResult, error) {
+	urlPattern, _ := step.Params["urlPattern"].(string)
+	if urlPattern == "" {
+		return ExecutionResult{Success: false}, fmt.Errorf("缺少 URL 匹配模式")
+	}
+
+	action, _ := step.Params["action"].(string)
+	if action == "" {
+		action = "block"
+	}
+
+	mockResponse, _ := step.Params["mockResponse"].(string)
+	redirectUrl, _ := step.Params["redirectUrl"].(string)
+	saveDirectory, _ := step.Params["saveDirectory"].(string)
+	statusCode := 403
+	if sc, ok := step.Params["statusCode"].(float64); ok {
+		statusCode = int(sc)
+	}
+
+	log.Printf("[Workflow] 设置请求拦截: urlPattern=%s, action=%s", urlPattern, action)
+
+	msg := WSMessage{
+		Type: "setup_intercept",
+		Data: map[string]interface{}{
+			"urlPattern":    urlPattern,
+			"action":        action,
+			"mockResponse":  mockResponse,
+			"redirectUrl":   redirectUrl,
+			"saveDirectory": saveDirectory,
+			"statusCode":    statusCode,
+		},
+	}
+
+	return we.sendAndWait(msg, 10*time.Second, "setup_intercept")
 }
 
 // emitStatus 发送状态到前端

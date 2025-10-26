@@ -13,9 +13,6 @@ import (
 var assets embed.FS
 
 func main() {
-	// 启动测试服务器(可选)
-	go startTestServer()
-
 	// Create an instance of the app structure
 	app := NewApp()
 	networkApp := NewNetworkApp()
