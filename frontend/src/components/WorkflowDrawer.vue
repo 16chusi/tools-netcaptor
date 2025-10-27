@@ -263,10 +263,16 @@ onMounted(async () => {
   await checkWorkflowStatus()
   
   EventsOn('workflow_status', (status: any) => {
+    console.log('[WorkflowDrawer] 收到工作流状态:', status)
     if (status.status === 'running') {
-      runningTaskId.value = status.taskID
+      runningTaskId.value = status.taskId
     } else if (status.status === 'success' || status.status === 'failed' || status.status === 'stopped') {
       runningTaskId.value = undefined
+      if (status.status === 'success') {
+        toast.success('任务执行完成')
+      } else if (status.status === 'failed') {
+        toast.error('任务执行失败: ' + (status.errorMessage || '未知错误'))
+      }
     }
   })
 })
@@ -296,16 +302,11 @@ async function runTask(taskId: string) {
     runningTaskId.value = taskId
     const taskToRun = main.WorkflowTask.createFrom(task)
     await ExecuteWorkflow(taskToRun)
+    // ExecuteWorkflow 在后端异步执行，不会等待完成
+    // 实际状态通过 workflow_status 事件更新
   } catch (error: any) {
-    console.error('[WorkflowDrawer] 执行失败:', error)
-    const errorMsg = error.message || error.toString()
-    if (errorMsg.includes('超时') || errorMsg.includes('timeout')) {
-      toast.error('执行超时：浏览器扩展未响应')
-    } else if (errorMsg.includes('未连接') || errorMsg.includes('not connected')) {
-      toast.error('浏览器扩展未连接')
-    } else {
-      toast.error('执行失败: ' + errorMsg)
-    }
+    console.error('[WorkflowDrawer] 启动失败:', error)
+    toast.error('启动失败: ' + (error.message || error.toString()))
     runningTaskId.value = undefined
   }
 }

@@ -133,11 +133,16 @@ func (we *WorkflowExecutor) Execute(task WorkflowTask) error {
 		log.Printf("[Workflow] 步骤完成: %v", result.Message)
 	}
 
+	log.Printf("[Workflow] 所有步骤执行完成，流程到达结束节点")
+
+	// 查找结束节点并高亮显示
+	endNodeID := we.findEndNode(task)
 	we.emitStatus(ExecutionStatus{
 		TaskID:      task.ID,
 		CurrentStep: len(steps),
 		TotalSteps:  len(steps),
 		Status:      "success",
+		CurrentNode: endNodeID,
 	})
 
 	log.Printf("[Workflow] 任务执行完成")
@@ -194,6 +199,16 @@ func (we *WorkflowExecutor) buildExecutionPlan(task WorkflowTask) ([]ExecutionSt
 	return steps, nil
 }
 
+// findEndNode 查找结束节点
+func (we *WorkflowExecutor) findEndNode(task WorkflowTask) string {
+	for i := range task.Nodes {
+		if task.Nodes[i].Type == "end" {
+			return task.Nodes[i].ID
+		}
+	}
+	return ""
+}
+
 // traverseNodes 遍历节点
 func (we *WorkflowExecutor) traverseNodes(nodeID string, nodeMap map[string]*WorkflowNode,
 	edgeMap map[string][]string, visited map[string]bool, steps *[]ExecutionStep) {
@@ -212,6 +227,8 @@ func (we *WorkflowExecutor) traverseNodes(nodeID string, nodeMap map[string]*Wor
 	if node.Type != "start" && node.Type != "end" {
 		step := we.nodeToStep(node)
 		*steps = append(*steps, step)
+	} else if node.Type == "end" {
+		log.Printf("[Workflow] 到达结束节点: %s", node.ID)
 	}
 
 	// 继续遍历子节点

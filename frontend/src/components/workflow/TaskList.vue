@@ -29,13 +29,18 @@
         </div>
         <div class="task-actions">
           <button 
-            @click.stop="$emit(runningTaskId === task.id ? 'stop' : 'run', task.id)" 
-            :class="['action-btn', runningTaskId === task.id ? 'stop' : 'run']"
-            :disabled="runningTaskId && runningTaskId !== task.id"
-            :title="runningTaskId === task.id ? '停止任务' : '运行任务'"
-          >
-            {{ runningTaskId === task.id ? '⏹️' : '▶️' }}
-          </button>
+            v-if="runningTaskId === task.id"
+            @click.stop="$emit('stop', task.id)" 
+            class="action-btn stop"
+            title="停止任务"
+          >⏹️</button>
+          <button 
+            v-else
+            @click.stop="$emit('run', task.id)" 
+            class="action-btn run"
+            :disabled="!!runningTaskId"
+            title="运行任务"
+          >▶️</button>
           <button 
             @click.stop="$emit('delete', task.id)" 
             class="action-btn delete" 
@@ -243,11 +248,11 @@ function cancelEdit() {
 }
 
 .task-item.running {
-  background: #f6ffed;
+  background: #f6ffed !important;
   border-left: 3px solid #52c41a;
 }
 
-.task-item.running .action-btn.run {
+.task-item.running .action-btn {
   opacity: 1;
 }
 
