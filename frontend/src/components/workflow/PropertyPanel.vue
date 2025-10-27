@@ -137,9 +137,27 @@
       <!-- 条件判断 -->
       <template v-if="nodeType === 'if'">
         <div class="form-item">
-          <label>条件表达式</label>
-          <input v-model="formData.condition" placeholder="{{变量}} == 值" />
-          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">支持: ==, !=, >, <, >=, <=</small>
+          <label>左值</label>
+          <input v-model="formData.leftValue" placeholder="{变量} 或 固定值" />
+        </div>
+        <div class="form-item">
+          <label>运算符</label>
+          <select v-model="formData.operator">
+            <option value="==">等于 (==)</option>
+            <option value="!=">不等于 (!=)</option>
+            <option value=">">大于 (>)</option>
+            <option value="<">小于 (<)</option>
+            <option value=">=">大于等于 (>=)</option>
+            <option value="<=">小于等于 (<=)</option>
+            <option value="contains">包含 (contains)</option>
+            <option value="notContains">不包含 (not contains)</option>
+            <option value="startsWith">开头是 (starts with)</option>
+            <option value="endsWith">结尾是 (ends with)</option>
+          </select>
+        </div>
+        <div class="form-item">
+          <label>右值</label>
+          <input v-model="formData.rightValue" placeholder="{变量} 或 固定值" />
         </div>
         <div class="form-item">
           <label>True 分支端口</label>
@@ -354,6 +372,9 @@ watch(() => props.nodeData, (newData) => {
       formData.value.statusCode = 403
     }
     if (props.nodeType === 'if') {
+      if (!formData.value.operator) {
+        formData.value.operator = '=='
+      }
       if (!formData.value.truePort) {
         formData.value.truePort = 'right'
       }

@@ -9,9 +9,12 @@ import (
 
 // executeIf 执行条件判断
 func (we *WorkflowExecutor) executeIf(step ExecutionStep, task WorkflowTask) (string, error) {
-	condition, ok := step.Params["condition"].(string)
-	if !ok || condition == "" {
-		return "", fmt.Errorf("缺少 condition 参数")
+	leftValue, _ := step.Params["leftValue"].(string)
+	operator, _ := step.Params["operator"].(string)
+	rightValue, _ := step.Params["rightValue"].(string)
+
+	if leftValue == "" || operator == "" {
+		return "", fmt.Errorf("缺少条件参数")
 	}
 
 	truePort, _ := step.Params["truePort"].(string)
@@ -24,8 +27,10 @@ func (we *WorkflowExecutor) executeIf(step ExecutionStep, task WorkflowTask) (st
 		falsePort = "left"
 	}
 
+	log.Printf("[Workflow] 评估条件: %s %s %s", leftValue, operator, rightValue)
+
 	// 评估条件
-	result, err := we.evaluateCondition(condition)
+	result, err := we.compare(leftValue, operator, rightValue)
 	if err != nil {
 		return "", fmt.Errorf("条件评估失败: %w", err)
 	}
@@ -55,44 +60,25 @@ func (we *WorkflowExecutor) executeIf(step ExecutionStep, task WorkflowTask) (st
 	return "", fmt.Errorf("if 节点的 %s 端口未连接", targetPort)
 }
 
-// evaluateCondition 评估条件表达式
-func (we *WorkflowExecutor) evaluateCondition(condition string) (bool, error) {
-	// 支持的运算符
-	operators := []string{"==", "!=", ">=", "<=", ">", "<"}
-
-	var operator string
-	var parts []string
-
-	// 查找运算符
-	for _, op := range operators {
-		if strings.Contains(condition, op) {
-			operator = op
-			parts = strings.SplitN(condition, op, 2)
-			break
-		}
-	}
-
-	if operator == "" || len(parts) != 2 {
-		return false, fmt.Errorf("无效的条件表达式: %s", condition)
-	}
-
-	left := strings.TrimSpace(parts[0])
-	right := strings.TrimSpace(parts[1])
-
-	log.Printf("[Workflow] 评估条件: %s %s %s", left, operator, right)
-
-	// 比较
-	return we.compare(left, operator, right)
-}
-
 // compare 比较两个值
 func (we *WorkflowExecutor) compare(left, operator, right string) (bool, error) {
+	// 字符串操作
+	switch operator {
+	case "contains":
+		return strings.Contains(left, right), nil
+	case "notContains":
+		return !strings.Contains(left, right), nil
+	case "startsWith":
+		return strings.HasPrefix(left, right), nil
+	case "endsWith":
+		return strings.HasSuffix(left, right), nil
+	}
+
 	// 尝试数字比较
 	leftNum, leftErr := strconv.ParseFloat(left, 64)
 	rightNum, rightErr := strconv.ParseFloat(right, 64)
 
 	if leftErr == nil && rightErr == nil {
-		// 数字比较
 		switch operator {
 		case "==":
 			return leftNum == rightNum, nil
