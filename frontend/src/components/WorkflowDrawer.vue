@@ -20,6 +20,7 @@
           @create="createTask"
           @delete="deleteTask"
           @rename="renameTask"
+          @run="runTask"
           @stop="stopWorkflow"
         />
         <div class="editor-area">
@@ -48,14 +49,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { Graph } from '@antv/x6'
 import TaskList from './workflow/TaskList.vue'
 import StencilPanel from './workflow/StencilPanel.vue'
 import FlowCanvas from './workflow/FlowCanvas.vue'
 import PropertyPanel from './workflow/PropertyPanel.vue'
 import { toast } from '../utils/toast'
-import { SaveWorkflowTask, GetAllWorkflowTasks, DeleteWorkflowTask, StartWebSocketServer, StopWebSocketServer, GetWebSocketPort, IsWebSocketRunning, IsWorkflowRunning, StopWorkflow } from '../../wailsjs/go/main/NetworkApp'
+import { SaveWorkflowTask, GetAllWorkflowTasks, DeleteWorkflowTask, StartWebSocketServer, StopWebSocketServer, GetWebSocketPort, IsWebSocketRunning, IsWorkflowRunning, StopWorkflow, ExecuteWorkflow } from '../../wailsjs/go/main/NetworkApp'
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
 import { main } from '../../wailsjs/go/models'
 
@@ -278,6 +279,34 @@ async function checkWorkflowStatus() {
     }
   } catch (error) {
     console.error('[WorkflowDrawer] 检查工作流状态失败:', error)
+  }
+}
+
+async function runTask(taskId: string) {
+  const task = tasks.value.find(t => t.id === taskId)
+  if (!task) return
+  
+  const wsRunning = await IsWebSocketRunning()
+  if (!wsRunning) {
+    toast.error('请先启动 WebSocket 服务')
+    return
+  }
+  
+  try {
+    runningTaskId.value = taskId
+    const taskToRun = main.WorkflowTask.createFrom(task)
+    await ExecuteWorkflow(taskToRun)
+  } catch (error: any) {
+    console.error('[WorkflowDrawer] 执行失败:', error)
+    const errorMsg = error.message || error.toString()
+    if (errorMsg.includes('超时') || errorMsg.includes('timeout')) {
+      toast.error('执行超时：浏览器扩展未响应')
+    } else if (errorMsg.includes('未连接') || errorMsg.includes('not connected')) {
+      toast.error('浏览器扩展未连接')
+    } else {
+      toast.error('执行失败: ' + errorMsg)
+    }
+    runningTaskId.value = undefined
   }
 }
 

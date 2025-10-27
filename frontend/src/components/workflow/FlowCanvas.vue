@@ -1,14 +1,8 @@
 <template>
   <div class="flow-canvas">
-    <div v-if="props.task" class="canvas-toolbar">
-      <button @click="handleRun" :disabled="isRunning" class="toolbar-btn primary">
-        {{ isRunning ? '⏸️ 运行中...' : '▶️ 运行' }}
-      </button>
-      <button v-if="isRunning" @click="handleStop" class="toolbar-btn danger">⏹️ 停止</button>
-      <div v-if="executionStatus" class="status-info">
-        <span>{{ executionStatus.currentStep }}/{{ executionStatus.totalSteps }}</span>
-        <span :class="'status-' + executionStatus.status">{{ getStatusText(executionStatus.status) }}</span>
-      </div>
+    <div v-if="executionStatus" class="canvas-status">
+      <span>{{ executionStatus.currentStep }}/{{ executionStatus.totalSteps }}</span>
+      <span :class="'status-' + executionStatus.status">{{ getStatusText(executionStatus.status) }}</span>
     </div>
     <div ref="containerRef" class="canvas-container"></div>
   </div>
@@ -31,7 +25,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  run: []
   change: [task: any]
   selectNode: [node: any]
   graphReady: [graph: Graph]
@@ -524,68 +517,7 @@ function showContextMenu(cell: any, clientX: number, clientY: number) {
   }, 100)
 }
 
-async function handleRun() {
-  if (!props.task || isRunning.value) return
-  
-  // 检查 WebSocket 状态
-  const wsRunning = await IsWebSocketRunning()
-  if (!wsRunning) {
-    toast.error('请先启动 WebSocket 服务')
-    return
-  }
-  
-  try {
-    isRunning.value = true
-    executionStatus.value = null
-    
-    console.log('[FlowCanvas] ========== 开始执行任务 ==========')
-    console.log('[FlowCanvas] 任务名称:', props.task.name)
-    console.log('[FlowCanvas] 任务ID:', props.task.id)
-    console.log('[FlowCanvas] 节点数量:', props.task.nodes?.length || 0)
-    
-    // 打印每个节点的详细信息
-    if (props.task.nodes) {
-      props.task.nodes.forEach((node: any, index: number) => {
-        console.log(`[FlowCanvas] 节点[${index}] - ID: ${node.id}, Type: ${node.type}, Label: ${node.label}`)
-        console.log(`[FlowCanvas] 节点[${index}] - Data:`, node.data)
-        if (node.data) {
-          Object.keys(node.data).forEach(key => {
-            console.log(`[FlowCanvas] 节点[${index}] - Data.${key} =`, node.data[key], `(type: ${typeof node.data[key]})`)
-          })
-        }
-      })
-    }
-    
-    console.log('[FlowCanvas] 完整任务数据:', JSON.stringify(props.task, null, 2))
-    
-    // 使用 Wails 生成的类型构造函数
-    const task = main.WorkflowTask.createFrom(props.task)
-    console.log('[FlowCanvas] 转换后的任务:', task)
-    console.log('[FlowCanvas] 任务ID:', task.id)
-    
-    await ExecuteWorkflow(task)
-  } catch (error: any) {
-    console.error('[FlowCanvas] 执行失败:', error)
-    const errorMsg = error.message || error.toString()
-    if (errorMsg.includes('超时') || errorMsg.includes('timeout')) {
-      toast.error('执行超时：浏览器扩展未响应，请检查扩展是否已安装并连接')
-    } else if (errorMsg.includes('未连接') || errorMsg.includes('not connected') || errorMsg.includes('未运行')) {
-      toast.error('浏览器扩展未连接，请先安装并启用扩展')
-    } else {
-      toast.error('执行失败: ' + errorMsg)
-    }
-    isRunning.value = false
-  }
-}
 
-async function handleStop() {
-  try {
-    await StopWorkflow()
-    isRunning.value = false
-  } catch (error: any) {
-    console.error('[FlowCanvas] 停止失败:', error)
-  }
-}
 
 function highlightNode(nodeId: string) {
   if (!graph) return
@@ -679,67 +611,15 @@ function emitChange() {
   background: #f5f5f5;
 }
 
-.canvas-toolbar {
-  padding: 8px 12px;
-  border-bottom: 1px solid #e0e0e0;
+.canvas-status {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
   background: white;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.toolbar-btn {
-  padding: 6px 12px;
-  border: 1px solid #d9d9d9;
-  background: white;
+  padding: 8px 16px;
   border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
-  transition: all 0.2s;
-}
-
-.toolbar-btn:hover {
-  border-color: #1890ff;
-  color: #1890ff;
-}
-
-.toolbar-btn.primary {
-  background: #1890ff;
-  color: white;
-  border-color: #1890ff;
-}
-
-.toolbar-btn.primary:hover:not(:disabled) {
-  background: #40a9ff;
-}
-
-.toolbar-btn.success {
-  background: #52c41a;
-  color: white;
-  border-color: #52c41a;
-}
-
-.toolbar-btn.success:hover {
-  background: #73d13d;
-}
-
-.toolbar-btn.danger {
-  background: #ff4d4f;
-  color: white;
-  border-color: #ff4d4f;
-}
-
-.toolbar-btn.danger:hover {
-  background: #ff7875;
-}
-
-.toolbar-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.status-info {
-  margin-left: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   gap: 12px;

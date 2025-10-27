@@ -24,22 +24,24 @@
           />
           <div v-else class="task-name" @dblclick.stop="startEdit(task)" title="双击编辑">
             {{ task.name }}
-            <span v-if="runningTaskId === task.id" class="running-badge">运行中</span>
           </div>
           <div class="task-meta">{{ formatDate(task.updatedAt) }}</div>
         </div>
-        <button 
-          v-if="runningTaskId === task.id" 
-          @click.stop="$emit('stop')" 
-          class="stop-btn" 
-          title="停止任务"
-        >⏹️</button>
-        <button 
-          v-else
-          @click.stop="$emit('delete', task.id)" 
-          class="delete-btn" 
-          title="删除任务"
-        >×</button>
+        <div class="task-actions">
+          <button 
+            @click.stop="$emit(runningTaskId === task.id ? 'stop' : 'run', task.id)" 
+            :class="['action-btn', runningTaskId === task.id ? 'stop' : 'run']"
+            :disabled="runningTaskId && runningTaskId !== task.id"
+            :title="runningTaskId === task.id ? '停止任务' : '运行任务'"
+          >
+            {{ runningTaskId === task.id ? '⏹️' : '▶️' }}
+          </button>
+          <button 
+            @click.stop="$emit('delete', task.id)" 
+            class="action-btn delete" 
+            title="删除任务"
+          >×</button>
+        </div>
       </div>
       <div v-if="tasks.length === 0" class="empty">
         暂无任务,点击"新建"创建
@@ -63,7 +65,8 @@ const emit = defineEmits<{
   create: []
   delete: [id: string]
   rename: [id: string, name: string]
-  stop: []
+  run: [id: string]
+  stop: [id: string]
 }>()
 
 const editingTaskId = ref<string>()
@@ -182,69 +185,70 @@ function cancelEdit() {
   outline: none;
 }
 
-.delete-btn {
-  width: 20px;
-  height: 20px;
+.task-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.action-btn {
+  width: 24px;
+  height: 24px;
   border: none;
   background: transparent;
-  color: #999;
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  padding: 0;
-  border-radius: 2px;
-  opacity: 0;
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
-
-.task-item:hover .delete-btn {
-  opacity: 1;
-}
-
-.delete-btn:hover {
-  background: #ff4d4f;
-  color: white;
-}
-
-.stop-btn {
-  width: 20px;
-  height: 20px;
-  border: none;
-  background: #ff4d4f;
-  color: white;
   cursor: pointer;
   font-size: 14px;
   line-height: 1;
   padding: 0;
-  border-radius: 2px;
+  border-radius: 3px;
   flex-shrink: 0;
   transition: all 0.2s;
+  opacity: 0;
 }
 
-.stop-btn:hover {
+.task-item:hover .action-btn {
+  opacity: 1;
+}
+
+.action-btn.run {
+  color: #52c41a;
+}
+
+.action-btn.run:hover:not(:disabled) {
+  background: #f6ffed;
+}
+
+.action-btn.stop {
+  background: #ff4d4f;
+  color: white;
+  opacity: 1;
+}
+
+.action-btn.stop:hover {
   background: #ff7875;
 }
 
-.running-badge {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 2px 6px;
-  background: #52c41a;
-  color: white;
-  font-size: 10px;
-  border-radius: 2px;
-  animation: pulse 1.5s infinite;
+.action-btn.delete {
+  color: #999;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+.action-btn.delete:hover {
+  background: #ff4d4f;
+  color: white;
+}
+
+.action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .task-item.running {
   background: #f6ffed;
   border-left: 3px solid #52c41a;
+}
+
+.task-item.running .action-btn.run {
+  opacity: 1;
 }
 
 .task-meta {
