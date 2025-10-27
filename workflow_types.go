@@ -23,10 +23,12 @@ type WorkflowNode struct {
 
 // WorkflowEdge 工作流边
 type WorkflowEdge struct {
-	ID     string `json:"id"`
-	Source string `json:"source"`
-	Target string `json:"target"`
-	Label  string `json:"label,omitempty"`
+	ID         string  `json:"id"`
+	Source     string  `json:"source"`
+	SourcePort *string `json:"sourcePort,omitempty"`
+	Target     string  `json:"target"`
+	TargetPort *string `json:"targetPort,omitempty"`
+	Label      string  `json:"label,omitempty"`
 }
 
 // ExecutionStep 执行步骤

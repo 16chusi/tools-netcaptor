@@ -145,15 +145,31 @@ function initGraph() {
         return this.createEdge({
           attrs: {
             line: {
-              stroke: '#1890ff',
+              stroke: '#0078D4',
               strokeWidth: 2,
               targetMarker: 'classic'
             }
           }
         })
       },
-      validateConnection({ sourceMagnet, targetMagnet }) {
-        return !!sourceMagnet && !!targetMagnet
+      validateConnection({ sourceMagnet, targetMagnet, sourceCell, targetCell }) {
+        if (!sourceMagnet || !targetMagnet) return false
+        
+        // if 节点允许多个输出
+        const sourceType = sourceCell?.getData()?.type
+        if (sourceType === 'if') return true
+        
+        // 其他节点只允许一个输入和一个输出
+        const targetType = targetCell?.getData()?.type
+        if (targetType !== 'if') {
+          const targetEdges = this.getConnectedEdges(targetCell, { incoming: true })
+          if (targetEdges.length > 0) return false
+        }
+        
+        const sourceEdges = this.getConnectedEdges(sourceCell, { outgoing: true })
+        if (sourceEdges.length > 0) return false
+        
+        return true
       }
     },
     interacting: {
@@ -168,6 +184,15 @@ function initGraph() {
 
   graph.on('edge:connected', ({ edge }) => {
     console.log('[FlowCanvas] 边已连接:', edge.id, edge.getSourceCellId(), '->', edge.getTargetCellId())
+    
+    // 保存端口信息
+    const sourcePort = edge.getSourcePortId()
+    const targetPort = edge.getTargetPortId()
+    edge.setData({
+      sourcePort,
+      targetPort
+    })
+    
     edge.addTools([
       {
         name: 'button-remove',
@@ -279,10 +304,12 @@ function addNode(type: string, label: string, x: number, y: number, color: strin
     },
     ports: {
       groups: {
-        top: { position: 'top', attrs: { circle: { r: 6, magnet: true, stroke: '#1890ff', strokeWidth: 2, fill: '#fff' } } },
-        bottom: { position: 'bottom', attrs: { circle: { r: 6, magnet: true, stroke: '#1890ff', strokeWidth: 2, fill: '#fff' } } }
+        top: { position: 'top', attrs: { circle: { r: 6, magnet: true, stroke: '#0078D4', strokeWidth: 2, fill: '#fff' } } },
+        right: { position: 'right', attrs: { circle: { r: 6, magnet: true, stroke: '#0078D4', strokeWidth: 2, fill: '#fff' } } },
+        bottom: { position: 'bottom', attrs: { circle: { r: 6, magnet: true, stroke: '#0078D4', strokeWidth: 2, fill: '#fff' } } },
+        left: { position: 'left', attrs: { circle: { r: 6, magnet: true, stroke: '#0078D4', strokeWidth: 2, fill: '#fff' } } }
       },
-      items: [{ group: 'top' }, { group: 'bottom' }]
+      items: [{ group: 'top' }, { group: 'right' }, { group: 'bottom' }, { group: 'left' }]
     },
     data: { type } // 初始化时只设置 type，其他属性由 PropertyPanel 设置
   }
@@ -312,7 +339,7 @@ function createDefaultNodes() {
 
   console.log('[FlowCanvas] 创建默认节点')
 
-  // 开始节点 - 圆形绿色
+  // 开始节点 - Windows 11 蓝色
   graph.addNode({
     x: 300,
     y: 50,
@@ -320,19 +347,19 @@ function createDefaultNodes() {
     height: 60,
     shape: 'circle',
     attrs: {
-      body: { fill: '#52c41a', stroke: '#52c41a' },
-      label: { text: '开始', fill: '#fff', fontSize: 12 }
+      body: { fill: 'rgba(0, 120, 212, 0.15)', stroke: '#0078D4', strokeWidth: 2 },
+      label: { text: '开始', fill: '#333', fontSize: 12 }
     },
     ports: {
       groups: {
-        bottom: { position: 'bottom', attrs: { circle: { r: 6, magnet: true, stroke: '#1890ff', strokeWidth: 2, fill: '#fff' } } }
+        bottom: { position: 'bottom', attrs: { circle: { r: 6, magnet: true, stroke: '#0078D4', strokeWidth: 2, fill: '#fff' } } }
       },
       items: [{ group: 'bottom' }]
     },
     data: { type: 'start' }
   })
 
-  // 结束节点 - 圆形红色
+  // 结束节点 - Windows 11 红色
   graph.addNode({
     x: 300,
     y: 400,
@@ -340,12 +367,12 @@ function createDefaultNodes() {
     height: 60,
     shape: 'circle',
     attrs: {
-      body: { fill: '#f5222d', stroke: '#f5222d' },
-      label: { text: '结束', fill: '#fff', fontSize: 12 }
+      body: { fill: 'rgba(209, 52, 56, 0.15)', stroke: '#D13438', strokeWidth: 2 },
+      label: { text: '结束', fill: '#333', fontSize: 12 }
     },
     ports: {
       groups: {
-        top: { position: 'top', attrs: { circle: { r: 6, magnet: true, stroke: '#1890ff', strokeWidth: 2, fill: '#fff' } } }
+        top: { position: 'top', attrs: { circle: { r: 6, magnet: true, stroke: '#0078D4', strokeWidth: 2, fill: '#fff' } } }
       },
       items: [{ group: 'top' }]
     },
@@ -376,12 +403,12 @@ function loadTask(task: WorkflowTask) {
           height: 60,
           shape: 'circle',
           attrs: {
-            body: { fill: '#52c41a', stroke: '#52c41a' },
-            label: { text: '开始', fill: '#fff', fontSize: 12 }
+            body: { fill: 'rgba(0, 120, 212, 0.15)', stroke: '#0078D4', strokeWidth: 2 },
+            label: { text: '开始', fill: '#333', fontSize: 12 }
           },
           ports: {
             groups: {
-              bottom: { position: 'bottom', attrs: { circle: { r: 6, magnet: true, stroke: '#1890ff', strokeWidth: 2, fill: '#fff' } } }
+              bottom: { position: 'bottom', attrs: { circle: { r: 6, magnet: true, stroke: '#0078D4', strokeWidth: 2, fill: '#fff' } } }
             },
             items: [{ group: 'bottom' }]
           },
@@ -396,12 +423,12 @@ function loadTask(task: WorkflowTask) {
           height: 60,
           shape: 'circle',
           attrs: {
-            body: { fill: '#f5222d', stroke: '#f5222d' },
-            label: { text: '结束', fill: '#fff', fontSize: 12 }
+            body: { fill: 'rgba(209, 52, 56, 0.15)', stroke: '#D13438', strokeWidth: 2 },
+            label: { text: '结束', fill: '#333', fontSize: 12 }
           },
           ports: {
             groups: {
-              top: { position: 'top', attrs: { circle: { r: 6, magnet: true, stroke: '#1890ff', strokeWidth: 2, fill: '#fff' } } }
+              top: { position: 'top', attrs: { circle: { r: 6, magnet: true, stroke: '#0078D4', strokeWidth: 2, fill: '#fff' } } }
             },
             items: [{ group: 'top' }]
           },
@@ -432,10 +459,12 @@ function loadTask(task: WorkflowTask) {
             },
             ports: {
               groups: {
-                top: { position: 'top', attrs: { circle: { r: 6, magnet: true, stroke: '#1890ff', strokeWidth: 2, fill: '#fff' } } },
-                bottom: { position: 'bottom', attrs: { circle: { r: 6, magnet: true, stroke: '#1890ff', strokeWidth: 2, fill: '#fff' } } }
+                top: { position: 'top', attrs: { circle: { r: 6, magnet: true, stroke: '#0078D4', strokeWidth: 2, fill: '#fff' } } },
+                right: { position: 'right', attrs: { circle: { r: 6, magnet: true, stroke: '#0078D4', strokeWidth: 2, fill: '#fff' } } },
+                bottom: { position: 'bottom', attrs: { circle: { r: 6, magnet: true, stroke: '#0078D4', strokeWidth: 2, fill: '#fff' } } },
+                left: { position: 'left', attrs: { circle: { r: 6, magnet: true, stroke: '#0078D4', strokeWidth: 2, fill: '#fff' } } }
               },
-              items: [{ group: 'top' }, { group: 'bottom' }]
+              items: [{ group: 'top' }, { group: 'right' }, { group: 'bottom' }, { group: 'left' }]
             },
             data: node.data || { type: node.type },
             tools: [
@@ -462,13 +491,13 @@ function loadTask(task: WorkflowTask) {
     // 加载边
     if (task.edges && task.edges.length > 0) {
       task.edges.forEach(edge => {
-        graph!.addEdge({
+        const newEdge = graph!.addEdge({
           id: edge.id,
           source: edge.source,
           target: edge.target,
           attrs: {
             line: {
-              stroke: '#1890ff',
+              stroke: '#0078D4',
               strokeWidth: 2,
               targetMarker: 'classic'
             }
@@ -480,6 +509,13 @@ function loadTask(task: WorkflowTask) {
             },
           ]
         })
+        // 恢复端口信息
+        if (edge.sourcePort || edge.targetPort) {
+          newEdge.setData({
+            sourcePort: edge.sourcePort,
+            targetPort: edge.targetPort
+          })
+        }
       })
       console.log('[FlowCanvas] 已加载', task.edges.length, '条边')
     }
@@ -524,8 +560,8 @@ function highlightNode(nodeId: string) {
   
   // 清除之前的高亮
   graph.getNodes().forEach(node => {
-    node.attr('body/stroke', node.getData()?.type === 'start' ? '#52c41a' : 
-                             node.getData()?.type === 'end' ? '#f5222d' : 
+    node.attr('body/stroke', node.getData()?.type === 'start' ? '#0078D4' : 
+                             node.getData()?.type === 'end' ? '#D13438' : 
                              node.attr('body/fill'))
     node.attr('body/strokeWidth', 1)
   })
@@ -578,7 +614,9 @@ function emitChange() {
       const edgeData = {
         id: edge.id,
         source: edge.getSourceCellId(),
-        target: edge.getTargetCellId()
+        sourcePort: edge.getSourcePortId(),
+        target: edge.getTargetCellId(),
+        targetPort: edge.getTargetPortId()
       }
       console.log(`[FlowCanvas] 序列化边[${index}]:`, edgeData)
       return edgeData
@@ -699,7 +737,7 @@ function emitChange() {
 
 :deep(.x6-port-body) {
   fill: #fff;
-  stroke: #1890ff;
+  stroke: #0078D4;
   stroke-width: 2;
 }
 
@@ -713,7 +751,7 @@ function emitChange() {
 }
 
 :deep(.available-magnet .x6-port-body) {
-  fill: #1890ff !important;
+  fill: #0078D4 !important;
   stroke: #fff !important;
   stroke-width: 3 !important;
   r: 8 !important;

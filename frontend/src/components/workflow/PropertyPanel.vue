@@ -138,7 +138,26 @@
       <template v-if="nodeType === 'if'">
         <div class="form-item">
           <label>条件表达式</label>
-          <input v-model="formData.condition" placeholder="变量 == 值" />
+          <input v-model="formData.condition" placeholder="{{变量}} == 值" />
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">支持: ==, !=, >, <, >=, <=</small>
+        </div>
+        <div class="form-item">
+          <label>True 分支端口</label>
+          <select v-model="formData.truePort">
+            <option value="top">上</option>
+            <option value="right">右</option>
+            <option value="bottom">下</option>
+            <option value="left">左</option>
+          </select>
+        </div>
+        <div class="form-item">
+          <label>False 分支端口</label>
+          <select v-model="formData.falsePort">
+            <option value="top">上</option>
+            <option value="right">右</option>
+            <option value="bottom">下</option>
+            <option value="left">左</option>
+          </select>
         </div>
       </template>
 
@@ -333,6 +352,14 @@ watch(() => props.nodeData, (newData) => {
     }
     if (!formData.value.statusCode) {
       formData.value.statusCode = 403
+    }
+    if (props.nodeType === 'if') {
+      if (!formData.value.truePort) {
+        formData.value.truePort = 'right'
+      }
+      if (!formData.value.falsePort) {
+        formData.value.falsePort = 'left'
+      }
     }
 
   } else {
