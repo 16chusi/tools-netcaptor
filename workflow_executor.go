@@ -131,12 +131,17 @@ func (we *WorkflowExecutor) executeFromNode(task WorkflowTask, nodeID string, st
 			})
 			return err
 		}
-		// JSONL读取器执行完成后，继续执行后续节点
-		nextNodeID := we.findNextNode(task, nodeID, "")
-		if nextNodeID == "" {
-			return fmt.Errorf("节点 %s 没有后续节点", nodeID)
-		}
-		return we.executeFromNode(task, nextNodeID, stepCount)
+		// JSONL读取器执行完成，循环体已经包含了所有后续节点，直接返回
+		log.Printf("[Workflow] JSONL读取器循环执行完成")
+		endNodeID := we.findEndNode(task)
+		we.emitStatus(ExecutionStatus{
+			TaskID:      task.ID,
+			CurrentStep: stepCount,
+			TotalSteps:  stepCount,
+			Status:      "success",
+			CurrentNode: endNodeID,
+		})
+		return nil
 	}
 
 	// if 节点特殊处理

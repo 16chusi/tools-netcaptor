@@ -260,6 +260,38 @@
           </div>
           <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">拦截的请求将被下载到此目录</small>
         </div>
+        <div class="form-item" v-if="formData.action === 'download'">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="margin: 0; min-width: 80px;">文件扩展名</label>
+            <input v-model="formData.fileExtension" placeholder="json" style="flex: 1;" />
+          </div>
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">如 json、txt、html、pdf、png 等，留空则自动检测</small>
+        </div>
+      </template>
+
+      <!-- 下载已捕获响应 -->
+      <template v-if="nodeType === 'download_captured'">
+        <div class="form-item">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="margin: 0; min-width: 80px;">URL匹配</label>
+            <input v-model="formData.urlPattern" placeholder="*/api/data*" style="flex: 1;" />
+          </div>
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">支持通配符 *，匹配已捕获的请求</small>
+        </div>
+        <div class="form-item">
+          <label>保存目录</label>
+          <div style="display: flex; gap: 8px;">
+            <input v-model="formData.saveDirectory" placeholder="选择保存目录" readonly style="flex: 1;" />
+            <button @click="selectDirectory" type="button" style="padding: 8px 12px; border: 1px solid #d9d9d9; background: white; border-radius: 4px; cursor: pointer;">选择</button>
+          </div>
+        </div>
+        <div class="form-item">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="margin: 0; min-width: 80px;">文件扩展名</label>
+            <input v-model="formData.fileExtension" placeholder="json" style="flex: 1;" />
+          </div>
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">如 json、txt、html 等，留空则自动检测</small>
+        </div>
       </template>
 
       <!-- JSONL读取器 -->

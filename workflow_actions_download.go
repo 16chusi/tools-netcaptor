@@ -117,6 +117,8 @@ func (we *WorkflowExecutor) executeDownload(step ExecutionStep) (ExecutionResult
 
 // executeInterceptRequest 执行请求拦截
 func (we *WorkflowExecutor) executeInterceptRequest(step ExecutionStep) (ExecutionResult, error) {
+	log.Printf("[Workflow] WebSocket 运行状态: %v, 客户端连接: %v", we.wsServer.IsRunning(), we.wsServer.HasClients())
+
 	urlPattern, _ := step.Params["urlPattern"].(string)
 	if urlPattern == "" {
 		return ExecutionResult{Success: false}, fmt.Errorf("缺少 URL 匹配模式")
@@ -130,12 +132,13 @@ func (we *WorkflowExecutor) executeInterceptRequest(step ExecutionStep) (Executi
 	mockResponse, _ := step.Params["mockResponse"].(string)
 	redirectUrl, _ := step.Params["redirectUrl"].(string)
 	saveDirectory, _ := step.Params["saveDirectory"].(string)
+	fileExtension, _ := step.Params["fileExtension"].(string)
 	statusCode := 403
 	if sc, ok := step.Params["statusCode"].(float64); ok {
 		statusCode = int(sc)
 	}
 
-	log.Printf("[Workflow] 设置请求拦截: urlPattern=%s, action=%s", urlPattern, action)
+	log.Printf("[Workflow] 设置请求拦截: urlPattern=%s, action=%s, saveDirectory=%s, fileExtension=%s", urlPattern, action, saveDirectory, fileExtension)
 
 	msg := WSMessage{
 		Type: "setup_intercept",
@@ -145,9 +148,11 @@ func (we *WorkflowExecutor) executeInterceptRequest(step ExecutionStep) (Executi
 			"mockResponse":  mockResponse,
 			"redirectUrl":   redirectUrl,
 			"saveDirectory": saveDirectory,
+			"fileExtension": fileExtension,
 			"statusCode":    statusCode,
 		},
 	}
+	log.Printf("[Workflow] 发送 WebSocket 消息: %+v", msg.Data)
 
 	return we.sendAndWait(msg, 10*time.Second, "setup_intercept")
 }

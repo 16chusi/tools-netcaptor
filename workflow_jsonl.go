@@ -75,9 +75,6 @@ func (we *WorkflowExecutor) executeJSONLReader(step ExecutionStep, task Workflow
 		return fmt.Errorf("JSONL读取器节点没有后续节点")
 	}
 
-	// 查找循环体的结束节点（回到JSONL节点的边）
-	loopEndNodeID := we.findLoopEndNode(task, step.NodeID)
-
 	// 遍历每一行数据
 	for i := 0; i < actualLoops; i++ {
 		// 检查是否停止
@@ -100,8 +97,8 @@ func (we *WorkflowExecutor) executeJSONLReader(step ExecutionStep, task Workflow
 		we.variables[saveToVariable] = extractedData
 		log.Printf("[Workflow] ✓ 变量已保存: %s = %v", saveToVariable, extractedData)
 
-		// 执行循环体（从下一个节点开始，直到循环结束节点）
-		if err := we.executeLoopBody(task, nextNodeID, loopEndNodeID, stepCount); err != nil {
+		// 执行循环体（从下一个节点开始，直到结束节点）
+		if err := we.executeLoopBody(task, nextNodeID, stepCount); err != nil {
 			return fmt.Errorf("执行第 %d 行时失败: %w", i+1, err)
 		}
 
@@ -115,25 +112,14 @@ func (we *WorkflowExecutor) executeJSONLReader(step ExecutionStep, task Workflow
 	return nil
 }
 
-// findLoopEndNode 查找循环体的结束节点
-func (we *WorkflowExecutor) findLoopEndNode(task WorkflowTask, loopNodeID string) string {
-	// 查找所有指向循环节点的边，这些边的source就是循环体的结束节点
-	for _, edge := range task.Edges {
-		if edge.Target == loopNodeID {
-			return edge.Source
-		}
-	}
-	return ""
-}
-
-// executeLoopBody 执行循环体
-func (we *WorkflowExecutor) executeLoopBody(task WorkflowTask, startNodeID string, endNodeID string, baseStepCount int) error {
+// executeLoopBody 执行循环体（从当前节点到结束节点）
+func (we *WorkflowExecutor) executeLoopBody(task WorkflowTask, startNodeID string, baseStepCount int) error {
 	currentNodeID := startNodeID
 	stepCount := baseStepCount
 
 	for {
-		// 如果到达结束节点或循环结束节点，退出
-		if currentNodeID == "" || currentNodeID == endNodeID {
+		// 如果节点ID为空，退出
+		if currentNodeID == "" {
 			break
 		}
 
@@ -144,6 +130,7 @@ func (we *WorkflowExecutor) executeLoopBody(task WorkflowTask, startNodeID strin
 
 		// 如果是结束节点，退出
 		if node.Type == "end" {
+			log.Printf("[Workflow] 循环体到达结束节点")
 			break
 		}
 

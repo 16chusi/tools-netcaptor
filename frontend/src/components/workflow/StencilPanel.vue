@@ -34,64 +34,7 @@ function initStencil() {
     collapsable: false,
     validateNode: () => true,
     getDragNode: (node) => node.clone(),
-    getDropNode: (node) => {
-      const cloned = node.clone()
-      const config = NODE_CONFIGS.find(c => c.type === node.getData()?.type)
-      if (config) {
-        // 保持颜色
-        cloned.setAttrs({
-          body: {
-            fill: config.color,
-            stroke: config.color,
-            strokeWidth: 2,
-            rx: 8,
-            ry: 8
-          }
-        })
-        // 添加连接点
-        cloned.setProp('ports', {
-          groups: {
-            top: { 
-              position: 'top',
-              attrs: { 
-                circle: { 
-                  r: 6, 
-                  magnet: true, 
-                  stroke: '#1890ff', 
-                  strokeWidth: 2,
-                  fill: '#fff'
-                } 
-              } 
-            },
-            bottom: { 
-              position: 'bottom',
-              attrs: { 
-                circle: { 
-                  r: 6, 
-                  magnet: true, 
-                  stroke: '#1890ff', 
-                  strokeWidth: 2,
-                  fill: '#fff'
-                } 
-              } 
-            }
-          },
-          items: [{ group: 'top' }, { group: 'bottom' }]
-        })
-        // 添加删除按钮
-        cloned.addTools([
-          {
-            name: 'button-remove',
-            args: {
-              x: '100%',
-              y: 0,
-              offset: { x: -10, y: 10 },
-            },
-          },
-        ])
-      }
-      return cloned
-    },
+    getDropNode: (node) => node.clone(),
     layoutOptions: {
       columns: 1,
       columnWidth: 180,

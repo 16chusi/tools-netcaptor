@@ -139,7 +139,7 @@ function initGraph() {
       highlight: true,
       connector: 'rounded',
       router: {
-        name: 'manhattan'
+        name: 'orth'
       },
       createEdge() {
         return this.createEdge({
@@ -152,24 +152,8 @@ function initGraph() {
           }
         })
       },
-      validateConnection({ sourceMagnet, targetMagnet, sourceCell, targetCell }) {
-        if (!sourceMagnet || !targetMagnet || !sourceCell || !targetCell) return false
-        
-        // if 节点允许多个输出
-        const sourceType = sourceCell.getData()?.type
-        if (sourceType === 'if') return true
-        
-        // 其他节点只允许一个输入和一个输出
-        const targetType = targetCell.getData()?.type
-        if (targetType !== 'if') {
-          const targetEdges = this.getConnectedEdges(targetCell, { incoming: true })
-          if (targetEdges.length > 0) return false
-        }
-        
-        const sourceEdges = this.getConnectedEdges(sourceCell, { outgoing: true })
-        if (sourceEdges.length > 0) return false
-        
-        return true
+      validateConnection({ targetMagnet }) {
+        return !!targetMagnet
       }
     },
     interacting: {
@@ -241,6 +225,11 @@ function initGraph() {
   })
   
   console.log('[FlowCanvas] Graph 已初始化')
+  
+  // 调试：暴露 graph 到 window
+  if (typeof window !== 'undefined') {
+    (window as any).__x6_graph__ = graph
+  }
   
   // 通知父组件 Graph 已就绪
   emit('graphReady', graph)

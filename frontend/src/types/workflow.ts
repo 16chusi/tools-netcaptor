@@ -38,6 +38,7 @@ export type NodeType =
   | 'scroll'
   | 'jsonl_reader'
   | 'intercept_request'
+  | 'download_captured'
 
 export interface NodeConfig {
   type: NodeType
