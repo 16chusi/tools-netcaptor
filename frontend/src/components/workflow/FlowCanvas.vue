@@ -153,14 +153,14 @@ function initGraph() {
         })
       },
       validateConnection({ sourceMagnet, targetMagnet, sourceCell, targetCell }) {
-        if (!sourceMagnet || !targetMagnet) return false
+        if (!sourceMagnet || !targetMagnet || !sourceCell || !targetCell) return false
         
         // if 节点允许多个输出
-        const sourceType = sourceCell?.getData()?.type
+        const sourceType = sourceCell.getData()?.type
         if (sourceType === 'if') return true
         
         // 其他节点只允许一个输入和一个输出
-        const targetType = targetCell?.getData()?.type
+        const targetType = targetCell.getData()?.type
         if (targetType !== 'if') {
           const targetEdges = this.getConnectedEdges(targetCell, { incoming: true })
           if (targetEdges.length > 0) return false

@@ -274,7 +274,7 @@ const workflowVisible = ref(false)
 let refreshInterval: any = null
 
 const filteredEntries = computed(() => {
-  let result = entries.value
+  let result = [...entries.value]
 
   if (filterType.value !== 'all') {
     result = result.filter(e => {
@@ -367,10 +367,10 @@ async function toggleProxy() {
 
 async function clearAll() {
   await ClearCapture()
-  entries.value = []
   selectedEntry.value = null
   filterText.value = ''
   filterType.value = 'all'
+  await refreshData()
 }
 
 async function openBrowser() {
