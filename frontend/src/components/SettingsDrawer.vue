@@ -55,7 +55,7 @@
             max="1000"
             step="10"
           />
-          <small>保存最近的 N 条记录，默认100，范围10-1000）</small>
+          <small>保存最近的 N 条记录（默认30，范围10-1000）</small>
         </div>
         
         <div class="setting-item">
@@ -92,7 +92,7 @@ const props = defineProps<{
   webhookRunning?: boolean
 }>()
 
-const maxHistoryEntries = ref(100)
+const maxHistoryEntries = ref(30)
 
 // 加载当前设置
 watch(() => props.visible, async (visible) => {
