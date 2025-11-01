@@ -61,7 +61,7 @@ func NewNetworkCapture() *NetworkCapture {
 		requests:   make([]NetworkRequest, 0),
 		responses:  make([]NetworkResponse, 0),
 		entries:    make([]NetworkEntry, 0),
-		maxEntries: 100, // 默认保存100条
+		maxEntries: 30, // 默认保存30条
 	}
 }
 

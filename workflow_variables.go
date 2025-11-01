@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"strings"
 )
 
@@ -16,6 +17,7 @@ func (we *WorkflowExecutor) replaceVariables(step *ExecutionStep) {
 
 // replaceVariablesInString 替换字符串中的变量
 func (we *WorkflowExecutor) replaceVariablesInString(str string) string {
+	original := str
 	for {
 		start := strings.Index(str, "{")
 		if start == -1 {
@@ -34,8 +36,12 @@ func (we *WorkflowExecutor) replaceVariablesInString(str string) string {
 		if value != nil {
 			str = strings.Replace(str, placeholder, fmt.Sprintf("%v", value), 1)
 		} else {
-			str = str[:start] + str[end+1:]
+			// 如果变量不存在，保留原样
+			break
 		}
+	}
+	if str != original {
+		log.Printf("[Workflow] 变量替换: %s -> %s", original, str)
 	}
 	return str
 }

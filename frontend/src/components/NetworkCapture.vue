@@ -99,8 +99,8 @@
       </div>
       <div class="table-body">
         <div
-            v-for="entry in filteredEntries"
-            :key="entry.id"
+            v-for="(entry, index) in filteredEntries"
+            :key="entry.id + '_' + index"
             :class="['table-row', {selected: selectedEntry === entry}]"
             @click="selectEntry(entry)"
         >
@@ -272,6 +272,7 @@ const webhookPort = ref<number>()
 const webhookRunning = ref(false)
 const workflowVisible = ref(false)
 let refreshInterval: any = null
+let pendingUpdate = false
 
 const filteredEntries = computed(() => {
   let result = [...entries.value]
@@ -346,7 +347,17 @@ onUnmounted(() => {
 })
 
 async function refreshData() {
-  entries.value = await GetAllEntries()
+  if (pendingUpdate) return
+  pendingUpdate = true
+  
+  try {
+    const newEntries = await GetAllEntries()
+    // 强制创建新数组，触发Vue响应式更新
+    entries.value = [...newEntries]
+    pendingUpdate = false
+  } catch (e) {
+    pendingUpdate = false
+  }
 }
 
 async function toggleProxy() {

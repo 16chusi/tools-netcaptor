@@ -292,6 +292,16 @@
           </div>
           <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">如 json、txt、html 等，留空则自动检测</small>
         </div>
+        <div class="form-item">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <label style="margin: 0; min-width: 80px;">重复文件</label>
+            <select v-model="formData.overwriteMode" style="flex: 1;">
+              <option value="skip">跳过</option>
+              <option value="overwrite">覆盖</option>
+            </select>
+          </div>
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">相同内容的文件处理方式</small>
+        </div>
       </template>
 
       <!-- JSONL读取器 -->
@@ -403,6 +413,9 @@ watch(() => props.nodeData, (newData) => {
     if (!formData.value.statusCode) {
       formData.value.statusCode = 403
     }
+    if (!formData.value.overwriteMode) {
+      formData.value.overwriteMode = 'skip'
+    }
     if (props.nodeType === 'if') {
       if (!formData.value.operator) {
         formData.value.operator = '=='
@@ -416,7 +429,7 @@ watch(() => props.nodeData, (newData) => {
     }
 
   } else {
-    formData.value = { selectorType: 'css', urlSource: 'direct', extractKeys: '*', interval: 100, openMode: 'current' }
+    formData.value = { selectorType: 'css', urlSource: 'direct', extractKeys: '*', interval: 100, openMode: 'current', overwriteMode: 'skip' }
   }
   console.log('[PropertyPanel] formData 已更新:', formData.value)
 }, { immediate: true, deep: true })

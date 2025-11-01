@@ -5,6 +5,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -138,6 +139,7 @@ func (gps *GoProxyServer) recordResponse(req *http.Request, resp *http.Response)
 
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	body := string(bodyBytes)
+	fullBody := body
 	if len(body) > 5000 {
 		body = body[:5000]
 	}
@@ -166,7 +168,7 @@ func (gps *GoProxyServer) recordResponse(req *http.Request, resp *http.Response)
 		Status:      resp.StatusCode,
 		StatusText:  resp.Status,
 		Headers:     headers,
-		Body:        body,
+		Body:        fullBody,
 		Size:        len(bodyBytes),
 		Duration:    duration,
 		ContentType: contentType,
@@ -174,6 +176,48 @@ func (gps *GoProxyServer) recordResponse(req *http.Request, resp *http.Response)
 
 	gps.capture.mu.Lock()
 	gps.capture.responses = append(gps.capture.responses, respData)
+
+	// 查找对应的请求并创建 NetworkEntry
+	var reqData NetworkRequest
+	for i := len(gps.capture.requests) - 1; i >= 0; i-- {
+		if gps.capture.requests[i].URL == url {
+			reqData = gps.capture.requests[i]
+			break
+		}
+	}
+
+	// 添加到 entries 列表
+	if reqData.URL != "" {
+		entry := NetworkEntry{
+			ID:         reqData.ID,
+			URL:        url,
+			Method:     reqData.Method,
+			Status:     resp.StatusCode,
+			StatusText: resp.Status,
+			Type:       reqData.Type,
+			Size:       len(bodyBytes),
+			Time:       reqData.Time,
+			Duration:   duration,
+			Domain:     reqData.Domain,
+			Path:       reqData.Path,
+			Request:    reqData,
+			Response:   respData,
+		}
+		gps.capture.entries = append(gps.capture.entries, entry)
+	}
+
+	// 限制历史记录数量，保留最近30条
+	if len(gps.capture.entries) > gps.capture.maxEntries {
+		gps.capture.entries = gps.capture.entries[len(gps.capture.entries)-gps.capture.maxEntries:]
+		log.Printf("[GoProxy] entries 被限制为 %d 条", len(gps.capture.entries))
+	}
+	if len(gps.capture.requests) > gps.capture.maxEntries {
+		gps.capture.requests = gps.capture.requests[len(gps.capture.requests)-gps.capture.maxEntries:]
+	}
+	if len(gps.capture.responses) > gps.capture.maxEntries {
+		gps.capture.responses = gps.capture.responses[len(gps.capture.responses)-gps.capture.maxEntries:]
+	}
+
 	gps.capture.mu.Unlock()
 }
 

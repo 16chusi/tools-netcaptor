@@ -45,6 +45,9 @@ func (we *WorkflowExecutor) executeNavigate(step ExecutionStep) (ExecutionResult
 		return ExecutionResult{Success: false}, fmt.Errorf("缺少 URL 参数")
 	}
 
+	log.Printf("[Workflow] 导航到: %s", url)
+	log.Printf("[Workflow] 当前变量: %+v", we.variables)
+
 	openMode := "current"
 	if mode, ok := step.Params["openMode"].(string); ok && mode != "" {
 		openMode = mode

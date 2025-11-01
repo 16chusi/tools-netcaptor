@@ -75,40 +75,8 @@ func (na *NetworkApp) GetAllResponses() []NetworkResponse {
 
 // 获取所有条目(合并请求和响应)
 func (na *NetworkApp) GetAllEntries() []NetworkEntry {
-	requests := na.capture.GetRequests()
-	responses := na.capture.GetResponses()
-
-	// 合并请求和响应
-	respMap := make(map[string]NetworkResponse)
-	for _, resp := range responses {
-		respMap[resp.URL] = resp
-	}
-
-	entries := make([]NetworkEntry, 0)
-	for _, req := range requests {
-		resp, hasResp := respMap[req.URL]
-		entry := NetworkEntry{
-			ID:      req.ID,
-			URL:     req.URL,
-			Method:  req.Method,
-			Type:    req.Type,
-			Time:    req.Time,
-			Domain:  req.Domain,
-			Path:    req.Path,
-			Request: req,
-		}
-
-		if hasResp {
-			entry.Status = resp.Status
-			entry.StatusText = resp.StatusText
-			entry.Size = resp.Size
-			entry.Duration = resp.Duration
-			entry.Response = resp
-		}
-
-		entries = append(entries, entry)
-	}
-
+	entries := na.capture.GetEntries()
+	log.Printf("[GetAllEntries] 返回条数: %d", len(entries))
 	return entries
 }
 

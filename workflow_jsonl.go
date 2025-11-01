@@ -82,7 +82,7 @@ func (we *WorkflowExecutor) executeJSONLReader(step ExecutionStep, task Workflow
 			return fmt.Errorf("执行已停止")
 		}
 
-		log.Printf("[Workflow] 处理第 %d/%d 行", i+1, lineCount)
+		log.Printf("[Workflow] ========== 处理第 %d/%d 行 ==========", i+1, lineCount)
 
 		// 获取当前行数据
 		lineData, err := reader.GetLine(i)
@@ -150,12 +150,16 @@ func (we *WorkflowExecutor) executeLoopBody(task WorkflowTask, startNodeID strin
 			CurrentNode: currentNodeID,
 		})
 
-		// if 节点特殊处理
+		// if 节点特殊处理 - 深拷贝 Params
 		if node.Type == "if" {
+			paramsCopy := make(map[string]interface{})
+			for k, v := range node.Data {
+				paramsCopy[k] = v
+			}
 			step := ExecutionStep{
 				NodeID: currentNodeID,
 				Action: node.Type,
-				Params: node.Data,
+				Params: paramsCopy,
 			}
 			we.replaceVariables(&step)
 
@@ -167,12 +171,17 @@ func (we *WorkflowExecutor) executeLoopBody(task WorkflowTask, startNodeID strin
 			continue
 		}
 
-		// 普通节点
+		// 普通节点 - 深拷贝 Params 避免修改原始数据
+		paramsCopy := make(map[string]interface{})
+		for k, v := range node.Data {
+			paramsCopy[k] = v
+		}
 		step := ExecutionStep{
 			NodeID: currentNodeID,
 			Action: node.Type,
-			Params: node.Data,
+			Params: paramsCopy,
 		}
+		we.replaceVariables(&step)
 
 		result, err := we.executeStep(step)
 		if err != nil {
