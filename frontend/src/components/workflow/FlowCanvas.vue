@@ -95,7 +95,7 @@ function initGraph() {
     autoResize: true,
     panning: {
       enabled: true,
-      modifiers: 'shift'
+      modifiers: null
     },
     mousewheel: {
       enabled: true,
@@ -158,6 +158,10 @@ function initGraph() {
     },
     interacting: {
       nodeMovable: true
+    },
+    scroller: {
+      enabled: true,
+      pannable: true
     }
   })
 
