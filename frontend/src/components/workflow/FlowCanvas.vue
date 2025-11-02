@@ -142,7 +142,7 @@ function initGraph() {
         name: 'orth'
       },
       createEdge() {
-        return this.createEdge({
+        return graph!.createEdge({
           attrs: {
             line: {
               stroke: '#0078D4',
@@ -152,25 +152,21 @@ function initGraph() {
           }
         })
       },
-      validateConnection({ targetMagnet }) {
+      validateConnection({ targetMagnet }: any) {
         return !!targetMagnet
       }
     },
     interacting: {
       nodeMovable: true
-    },
-    scroller: {
-      enabled: true,
-      pannable: true
     }
-  })
+  } as any)
 
   // 监听事件
-  graph.on('node:change:position', () => {
+  graph!.on('node:change:position', () => {
     emitChange()
   })
 
-  graph.on('edge:connected', ({ edge }) => {
+  graph!.on('edge:connected', ({ edge }: any) => {
     console.log('[FlowCanvas] 边已连接:', edge.id, edge.getSourceCellId(), '->', edge.getTargetCellId())
     
     // 保存端口信息
@@ -190,34 +186,58 @@ function initGraph() {
     emitChange()
   })
   
-  graph.on('edge:removed', () => {
+  graph!.on('edge:removed', () => {
     emitChange()
   })
   
-  graph.on('node:removed', () => {
+  graph!.on('node:removed', () => {
     emitChange()
   })
 
   // 监听节点点击
-  graph.on('node:click', ({ node }) => {
+  graph!.on('node:click', ({ node }: any) => {
+    // 清除其他节点的选中状态
+    graph!.getNodes().forEach(n => {
+      const data = n.getData() || {}
+      const isStart = data.type === 'start'
+      const isEnd = data.type === 'end'
+      n.attr('body/stroke', isStart ? '#0078D4' : isEnd ? '#D13438' : n.attr('body/fill'))
+      n.attr('body/strokeWidth', isStart || isEnd ? 2 : 1)
+    })
+    
+    // 高亮当前节点
+    node.attr('body/stroke', '#1890ff')
+    node.attr('body/strokeWidth', 3)
+    
     const data = node.getData() || {}
     const nodeData = {
       id: node.id,
       type: data.type,
       label: node.attr('label/text'),
-      data: data // 传递完整的 data 对象
+      data: data
     }
     console.log('[FlowCanvas] 节点点击:', nodeData)
     emit('selectNode', nodeData)
   })
 
+  // 点击画布空白处取消选中
+  graph!.on('blank:click', () => {
+    graph!.getNodes().forEach(n => {
+      const data = n.getData() || {}
+      const isStart = data.type === 'start'
+      const isEnd = data.type === 'end'
+      n.attr('body/stroke', isStart ? '#0078D4' : isEnd ? '#D13438' : n.attr('body/fill'))
+      n.attr('body/strokeWidth', isStart || isEnd ? 2 : 1)
+    })
+  })
+
   // 右键菜单
-  graph.on('node:contextmenu', ({ node, e }) => {
+  graph!.on('node:contextmenu', ({ node, e }: any) => {
     e.preventDefault()
     showContextMenu(node, e.clientX, e.clientY)
   })
 
-  graph.on('edge:contextmenu', ({ edge, e }) => {
+  graph!.on('edge:contextmenu', ({ edge, e }: any) => {
     e.preventDefault()
     showContextMenu(edge, e.clientX, e.clientY)
   })
@@ -240,7 +260,28 @@ function initGraph() {
 }
 
 function setupDragDrop() {
-  // 使用 X6 内置的 Dnd,不需要手动处理
+  if (!containerRef.value) return
+  
+  containerRef.value.addEventListener('dragover', (e) => {
+    e.preventDefault()
+    e.dataTransfer!.dropEffect = 'move'
+  })
+  
+  containerRef.value.addEventListener('drop', (e) => {
+    e.preventDefault()
+    const data = e.dataTransfer!.getData('application/x6-node')
+    if (data && graph) {
+      const nodeData = JSON.parse(data)
+      const point = graph.clientToLocal(e.clientX, e.clientY)
+      graph.addNode({
+        ...nodeData,
+        x: point.x - 80,
+        y: point.y - 25
+      })
+      emitChange()
+    }
+  })
+  
   console.log('[FlowCanvas] 拖拽已就绪')
 }
 
@@ -437,6 +478,11 @@ function loadTask(task: WorkflowTask) {
             width: 120,
             height: 40,
             shape: 'rect',
+            markup: [
+              { tagName: 'rect', selector: 'body' },
+              { tagName: 'text', selector: 'icon' },
+              { tagName: 'text', selector: 'label' }
+            ],
             attrs: {
               body: {
                 fill: config.color,
@@ -444,10 +490,21 @@ function loadTask(task: WorkflowTask) {
                 rx: 6,
                 ry: 6
               },
-              label: {
-                text: config.label,
+              icon: {
+                text: config.icon,
+                fontSize: 16,
                 fill: '#333',
-                fontSize: 12
+                refX: 12,
+                refY: 20,
+                textAnchor: 'start'
+              },
+              label: {
+                text: node.data?.customLabel || config.label,
+                fill: '#333',
+                fontSize: 11,
+                refX: 32,
+                refY: 20,
+                textAnchor: 'start'
               }
             },
             ports: {

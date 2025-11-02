@@ -85,12 +85,20 @@ func (na *NetworkApp) ClearCapture() {
 
 // 启动代理服务器
 func (na *NetworkApp) StartProxy() error {
+	log.Printf("[NetworkApp] 启动代理服务器，当前规则数量: %d", len(na.proxy.interceptor.GetRules()))
 	return na.proxy.Start()
 }
 
 // 使用指定端口启动代理服务器
 func (na *NetworkApp) StartProxyWithPort(port int) error {
+	// 保存旧的规则
+	oldRules := na.proxy.interceptor.GetRules()
 	na.proxy = NewGoProxyServer(port, na.capture)
+	// 恢复规则
+	if len(oldRules) > 0 {
+		log.Printf("[NetworkApp] 恢复 %d 条拦截规则", len(oldRules))
+		na.proxy.interceptor.SetRules(oldRules)
+	}
 	return na.proxy.Start()
 }
 
@@ -167,6 +175,20 @@ func (na *NetworkApp) SelectJSONLFile() (string, error) {
 	return path, err
 }
 
+// 选择保存文件路径
+func (na *NetworkApp) SelectSaveFilePath(defaultFilename string) (string, error) {
+	path, err := runtime.SaveFileDialog(na.ctx, runtime.SaveDialogOptions{
+		DefaultFilename: defaultFilename,
+		Title:           "选择保存文件",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "JSONL Files (*.jsonl)", Pattern: "*.jsonl"},
+			{DisplayName: "Text Files (*.txt)", Pattern: "*.txt"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+	return path, err
+}
+
 // 加载JSONL文件
 func (na *NetworkApp) LoadJSONLFile(filePath string) (map[string]interface{}, error) {
 	reader := NewJSONLReader(filePath)
@@ -187,6 +209,10 @@ func (na *NetworkApp) GetInterceptRules() []InterceptRule {
 
 // 设置拦截规则
 func (na *NetworkApp) SetInterceptRules(rules []InterceptRule) error {
+	log.Printf("[NetworkApp] 设置拦截规则，数量: %d", len(rules))
+	for i, rule := range rules {
+		log.Printf("[NetworkApp] 规则 %d: Name=%s, Pattern=%s, Enabled=%v, ActionType=%s", i, rule.Name, rule.URLPattern, rule.Enabled, rule.ActionType)
+	}
 	return na.proxy.interceptor.SetRules(rules)
 }
 

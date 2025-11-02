@@ -170,12 +170,52 @@ func (we *WorkflowExecutor) executeFromNode(task WorkflowTask, nodeID string, st
 		return we.executeFromNode(task, nextNodeID, stepCount)
 	}
 
+	// for 节点特殊处理
+	if node.Type == "for" {
+		step := ExecutionStep{
+			NodeID: nodeID,
+			Action: node.Type,
+			Params: node.Data,
+		}
+		we.replaceVariables(&step)
+
+		err := we.executeFor(step, task, stepCount)
+		if err != nil {
+			errMsg := fmt.Sprintf("步骤执行失败: %v", err)
+			log.Printf("[Workflow] %s", errMsg)
+			we.emitStatus(ExecutionStatus{
+				TaskID:       task.ID,
+				CurrentStep:  stepCount,
+				TotalSteps:   stepCount,
+				Status:       "failed",
+				CurrentNode:  nodeID,
+				ErrorMessage: errMsg,
+			})
+			return err
+		}
+		endNodeID := we.findEndNode(task)
+		we.emitStatus(ExecutionStatus{
+			TaskID:      task.ID,
+			CurrentStep: stepCount,
+			TotalSteps:  stepCount,
+			Status:      "success",
+			CurrentNode: endNodeID,
+		})
+		return nil
+	}
+
 	// 普通节点
 	step := ExecutionStep{
 		NodeID: nodeID,
 		Action: node.Type,
 		Params: node.Data,
 	}
+
+	log.Printf("[Workflow] ========== 执行节点前的变量 ==========")
+	for key, value := range we.variables {
+		log.Printf("[Workflow]   %s (%T) = %v", key, value, value)
+	}
+	log.Printf("[Workflow] =====================================")
 
 	result, err := we.executeStep(step)
 	if err != nil {
@@ -193,6 +233,12 @@ func (we *WorkflowExecutor) executeFromNode(task WorkflowTask, nodeID string, st
 	}
 
 	log.Printf("[Workflow] 步骤完成: %v", result.Message)
+	log.Printf("[Workflow] 节点返回的 result.Data: %+v", result.Data)
+	log.Printf("[Workflow] ========== 执行节点后的变量 ==========")
+	for key, value := range we.variables {
+		log.Printf("[Workflow]   %s (%T) = %v", key, value, value)
+	}
+	log.Printf("[Workflow] =====================================")
 
 	// 查找下一个节点
 	nextNodeID := we.findNextNode(task, nodeID, "")

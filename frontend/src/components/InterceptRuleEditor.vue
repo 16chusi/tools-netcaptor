@@ -23,6 +23,7 @@
             <option value="findReplace">内容替换</option>
             <option value="redirect">重定向</option>
             <option value="responseReplace">响应结果替换</option>
+            <option value="saveToFile">保存到文件</option>
           </select>
         </div>
         
@@ -76,6 +77,25 @@
           <input v-model="rule.webhookUrl" type="text" placeholder="http://localhost:3000/webhook">
         </div>
         
+        <!-- 保存到文件 -->
+        <div v-if="rule.actionType === 'saveToFile'">
+          <div class="form-group">
+            <label>文件路径</label>
+            <div style="display: flex; gap: 8px; flex: 1;">
+              <input v-model="rule.saveFilePath" type="text" placeholder="/tmp/captured.jsonl" style="flex: 1;">
+              <button @click="selectSaveFile" type="button" style="padding: 8px 12px; border: 1px solid #dadce0; background: white; border-radius: 4px; cursor: pointer;">选择</button>
+            </div>
+            <small>响应内容将自动追加到此文件</small>
+          </div>
+          <div class="form-group">
+            <label>保存格式</label>
+            <select v-model="rule.saveFormat">
+              <option value="jsonl">JSONL (每行一个JSON)</option>
+              <option value="text">文本 (每行追加)</option>
+            </select>
+          </div>
+        </div>
+        
         <div class="examples-section">
           <div class="examples-title">💡 使用示例</div>
           
@@ -119,7 +139,7 @@
 <script setup lang="ts">
 import { reactive, watch } from 'vue'
 import type { InterceptRule } from '../types/intercept'
-import {ShowErrorDialog} from '../../wailsjs/go/main/NetworkApp'
+import {ShowErrorDialog, SelectSaveFilePath} from '../../wailsjs/go/main/NetworkApp'
 
 const props = defineProps<{
   visible: boolean
@@ -141,7 +161,10 @@ const rule = reactive<InterceptRule>({
   responseContent: '',
   redirectUrl: '',
   webhookUrl: '',
-  webhookEnabled: false
+  webhookEnabled: false,
+  saveToFile: false,
+  saveFilePath: '',
+  saveFormat: 'jsonl'
 })
 
 watch(() => props.initialRule, (newRule) => {
@@ -161,8 +184,22 @@ watch(() => props.initialRule, (newRule) => {
     rule.redirectUrl = ''
     rule.webhookUrl = ''
     rule.webhookEnabled = false
+    rule.saveToFile = false
+    rule.saveFilePath = ''
+    rule.saveFormat = 'jsonl'
   }
 }, { immediate: true })
+
+async function selectSaveFile() {
+  try {
+    const path = await SelectSaveFilePath('captured.jsonl')
+    if (path) {
+      rule.saveFilePath = path
+    }
+  } catch (error: any) {
+    console.error('选择文件失败:', error)
+  }
+}
 
 function handleSave() {
   if (!rule.name || !rule.urlPattern) {
@@ -182,6 +219,11 @@ function handleSave() {
   
   if (rule.actionType === 'redirect' && !rule.redirectUrl) {
     ShowErrorDialog('验证错误', '请填写重定向 URL')
+    return
+  }
+  
+  if (rule.actionType === 'saveToFile' && !rule.saveFilePath) {
+    ShowErrorDialog('验证错误', '请填写文件路径')
     return
   }
   

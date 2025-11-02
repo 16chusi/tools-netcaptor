@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"io"
+	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -14,7 +16,7 @@ type InterceptRule struct {
 	Name            string `json:"name"`
 	Enabled         bool   `json:"enabled"`
 	URLPattern      string `json:"urlPattern"`
-	ActionType      string `json:"actionType"` // "findReplace", "redirect", "responseReplace"
+	ActionType      string `json:"actionType"` // "findReplace", "redirect", "responseReplace", "saveToFile"
 	FindText        string `json:"findText,omitempty"`
 	ReplaceText     string `json:"replaceText,omitempty"`
 	UseRegex        bool   `json:"useRegex,omitempty"`
@@ -23,6 +25,10 @@ type InterceptRule struct {
 	RedirectURL     string `json:"redirectUrl,omitempty"`
 	WebhookURL      string `json:"webhookUrl,omitempty"`
 	WebhookEnabled  bool   `json:"webhookEnabled,omitempty"`
+	// 新增：自动保存到文件
+	SaveToFile   bool   `json:"saveToFile,omitempty"`
+	SaveFilePath string `json:"saveFilePath,omitempty"`
+	SaveFormat   string `json:"saveFormat,omitempty"` // "jsonl", "text"
 
 	compiledURLRegex  *regexp.Regexp
 	compiledFindRegex *regexp.Regexp
@@ -71,10 +77,16 @@ func (i *Interceptor) matchURL(url string, rule InterceptRule) bool {
 }
 
 func matchWildcard(text, pattern string) bool {
-	// Convert wildcard pattern to regex
-	// * matches any characters
-	regexPattern := "^" + regexp.QuoteMeta(pattern) + "$"
-	regexPattern = strings.ReplaceAll(regexPattern, "\\*", ".*")
+	if !strings.Contains(pattern, "*") {
+		return text == pattern
+	}
+
+	// 转义特殊字符，但保留 *
+	parts := strings.Split(pattern, "*")
+	for i := range parts {
+		parts[i] = regexp.QuoteMeta(parts[i])
+	}
+	regexPattern := "^" + strings.Join(parts, ".*") + "$"
 
 	matched, _ := regexp.MatchString(regexPattern, text)
 	return matched
@@ -85,11 +97,23 @@ func (i *Interceptor) InterceptResponse(resp *http.Response, req *http.Request) 
 	defer i.mu.RUnlock()
 
 	url := req.URL.String()
+	if url == "" {
+		url = "http://" + req.Host + req.URL.Path
+		if req.URL.RawQuery != "" {
+			url += "?" + req.URL.RawQuery
+		}
+	}
+
+	log.Printf("[Interceptor] 检查URL: %s, 规则数量: %d", url, len(i.rules))
 
 	for _, rule := range i.rules {
+		log.Printf("[Interceptor] 测试规则: %s, Pattern: %s, Enabled: %v", rule.Name, rule.URLPattern, rule.Enabled)
 		if !i.matchURL(url, rule) {
+			log.Printf("[Interceptor] URL不匹配: %s vs %s", url, rule.URLPattern)
 			continue
 		}
+
+		log.Printf("[Interceptor] ✓ 匹配到规则: %s, ActionType: %s, SaveFilePath: %s", rule.Name, rule.ActionType, rule.SaveFilePath)
 
 		// Read original body
 		bodyBytes, err := io.ReadAll(resp.Body)
@@ -146,6 +170,14 @@ func (i *Interceptor) InterceptResponse(resp *http.Response, req *http.Request) 
 			go sendWebhook(rule.WebhookURL, url, bodyStr)
 		}
 
+		// 自动保存到文件 (async)
+		if (rule.ActionType == "saveToFile" || rule.SaveToFile) && rule.SaveFilePath != "" {
+			log.Printf("[Interceptor] 触发保存到文件: %s", rule.SaveFilePath)
+			go saveResponseToFile(rule.SaveFilePath, bodyStr, rule.SaveFormat)
+		} else {
+			log.Printf("[Interceptor] 未触发保存: ActionType=%s, SaveToFile=%v, SaveFilePath=%s", rule.ActionType, rule.SaveToFile, rule.SaveFilePath)
+		}
+
 		break // Only apply first matching rule
 	}
 
@@ -162,4 +194,45 @@ func sendWebhook(webhookURL, requestURL, body string) {
 	// This is a simplified version - in production you'd want proper error handling
 	_ = payload
 	// http.Post(webhookURL, "application/json", bytes.NewBuffer(jsonData))
+}
+
+func saveResponseToFile(filePath, body, format string) {
+	log.Printf("[Interceptor] saveResponseToFile 被调用: filePath=%s, bodyLen=%d, format=%s", filePath, len(body), format)
+
+	if format == "" {
+		format = "jsonl"
+	}
+
+	// 检查文件是否存在
+	fileInfo, err := os.Stat(filePath)
+	if err == nil {
+		log.Printf("[Interceptor] 文件已存在，当前大小: %d 字节", fileInfo.Size())
+	} else {
+		log.Printf("[Interceptor] 文件不存在，将创建新文件")
+	}
+
+	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Printf("[Interceptor] 保存文件失败: %v", err)
+		return
+	}
+	defer file.Close()
+
+	var content string
+	if format == "jsonl" {
+		content = body + "\n"
+	} else {
+		content = body + "\n"
+	}
+
+	n, err := file.WriteString(content)
+	if err != nil {
+		log.Printf("[Interceptor] 写入文件失败: %v", err)
+	} else {
+		log.Printf("[Interceptor] ✓ 响应已追加到: %s (写入: %d 字节)", filePath, n)
+		// 再次检查文件大小
+		if fileInfo2, err := os.Stat(filePath); err == nil {
+			log.Printf("[Interceptor] 写入后文件大小: %d 字节", fileInfo2.Size())
+		}
+	}
 }

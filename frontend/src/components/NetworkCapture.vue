@@ -686,21 +686,25 @@ function exportRules() {
 
 async function saveRulesToStorage() {
   localStorage.setItem('interceptRules', JSON.stringify(interceptRules.value))
+  console.log('[前端] 保存规则到后端，数量:', interceptRules.value.length, interceptRules.value)
   // 同步到后端
   try {
     await SetInterceptRules(interceptRules.value)
+    console.log('[前端] 规则同步成功')
   } catch (e) {
-    console.error('Failed to sync rules to backend:', e)
+    console.error('[前端] 规则同步失败:', e)
   }
 }
 
 function loadRulesFromStorage() {
   const stored = localStorage.getItem('interceptRules')
+  console.log('[前端] 从 localStorage 加载规则:', stored)
   if (stored) {
     try {
       interceptRules.value = JSON.parse(stored)
+      console.log('[前端] 解析后的规则数量:', interceptRules.value.length)
     } catch (e) {
-      console.error('Failed to load rules:', e)
+      console.error('[前端] 加载规则失败:', e)
     }
   }
 }
@@ -751,8 +755,14 @@ async function stopWebhook() {
 
 onMounted(async () => {
   loadRulesFromStorage()
+  console.log('[前端] onMounted - 加载规则数量:', interceptRules.value.length)
   // 同步到后端
   await saveRulesToStorage()
+  // 延迟再同步一次，确保代理服务器已启动
+  setTimeout(async () => {
+    console.log('[前端] 延迟同步规则')
+    await saveRulesToStorage()
+  }, 1000)
 })
 </script>
 <style scoped>

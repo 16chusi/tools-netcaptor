@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -48,12 +49,42 @@ func (we *WorkflowExecutor) replaceVariablesInString(str string) string {
 
 // resolveVariablePath 解析变量路径 支持 data.url 和 data[url]
 func (we *WorkflowExecutor) resolveVariablePath(path string) interface{} {
+	log.Printf("[Workflow] resolveVariablePath: %s", path)
+
 	if strings.Contains(path, ".") {
 		parts := strings.SplitN(path, ".", 2)
+		log.Printf("[Workflow] 解析嵌套路径: 变量=%s, 字段=%s", parts[0], parts[1])
+
 		if val, ok := we.variables[parts[0]]; ok {
+			log.Printf("[Workflow] 变量 %s 存在，类型: %T, 值: %v", parts[0], val, val)
+
+			// 如果是 map，直接访问
 			if mapVal, isMap := val.(map[string]interface{}); isMap {
-				return mapVal[parts[1]]
+				log.Printf("[Workflow] 变量是 map，访问字段: %s", parts[1])
+				if result, exists := mapVal[parts[1]]; exists {
+					log.Printf("[Workflow] ✓ 找到字段 %s: %v", parts[1], result)
+					return result
+				}
+				log.Printf("[Workflow] ✗ map 中不存在字段: %s", parts[1])
 			}
+
+			// 如果是 JSON 字符串，尝试解析
+			if strVal, isStr := val.(string); isStr {
+				log.Printf("[Workflow] 变量是字符串，尝试解析 JSON")
+				var jsonData map[string]interface{}
+				if err := json.Unmarshal([]byte(strVal), &jsonData); err == nil {
+					log.Printf("[Workflow] JSON 解析成功，访问字段: %s", parts[1])
+					if result, exists := jsonData[parts[1]]; exists {
+						log.Printf("[Workflow] ✓ 找到字段 %s: %v", parts[1], result)
+						return result
+					}
+					log.Printf("[Workflow] ✗ JSON 中不存在字段: %s", parts[1])
+				} else {
+					log.Printf("[Workflow] JSON 解析失败: %v", err)
+				}
+			}
+		} else {
+			log.Printf("[Workflow] ✗ 变量 %s 不存在", parts[0])
 		}
 	} else if strings.Contains(path, "[") && strings.Contains(path, "]") {
 		start := strings.Index(path, "[")
@@ -66,7 +97,12 @@ func (we *WorkflowExecutor) resolveVariablePath(path string) interface{} {
 			}
 		}
 	} else {
-		return we.variables[path]
+		log.Printf("[Workflow] 直接访问变量: %s", path)
+		if val, ok := we.variables[path]; ok {
+			log.Printf("[Workflow] ✓ 变量存在，类型: %T", val)
+			return val
+		}
+		log.Printf("[Workflow] ✗ 变量不存在: %s", path)
 	}
 	return nil
 }

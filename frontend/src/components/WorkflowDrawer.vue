@@ -40,6 +40,7 @@
               :nodeData="selectedNode?.data"
               @close="propertyVisible = false"
               @save="onSaveNodeData"
+              @updateLabel="onUpdateLabel"
             />
           </div>
         </div>
@@ -159,6 +160,8 @@ async function renameTask(id: string, name: string) {
   toast.success('重命名成功')
 }
 
+let saveTimer: number | null = null
+
 async function onTaskChange(task: any) {
   console.log('[WorkflowDrawer] ========== onTaskChange ==========')
   console.log('[WorkflowDrawer] 更新任务:', task)
@@ -167,8 +170,11 @@ async function onTaskChange(task: any) {
     tasks.value[index] = { ...task }
     console.log('[WorkflowDrawer] ✓ 任务已更新到列表')
     
-    // 自动保存
-    await autoSaveTask(task)
+    // 防抖自动保存
+    if (saveTimer) clearTimeout(saveTimer)
+    saveTimer = window.setTimeout(() => {
+      autoSaveTask(task)
+    }, 500)
   }
 }
 
@@ -237,6 +243,17 @@ function onSaveNodeData(data: Record<string, any>) {
   }
   
   selectedNode.value.data = { ...selectedNode.value.data, ...data }
+}
+
+function onUpdateLabel(label: string) {
+  if (!selectedNode.value || !graphInstance.value) return
+  
+  const node = graphInstance.value.getCellById(selectedNode.value.id)
+  if (node) {
+    node.attr('label/text', label)
+    const currentData = node.getData() || {}
+    node.setData({ ...currentData, customLabel: label })
+  }
 }
 
 // 加载任务

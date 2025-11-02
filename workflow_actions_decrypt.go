@@ -25,14 +25,14 @@ func (we *WorkflowExecutor) executeDecrypt(step ExecutionStep) (ExecutionResult,
 		return ExecutionResult{Success: false}, fmt.Errorf("缺少密钥")
 	}
 
-	data, exists := we.variables[dataVariable]
-	if !exists {
+	data := we.resolveVariablePath(dataVariable)
+	if data == nil {
 		return ExecutionResult{Success: false}, fmt.Errorf("变量 %s 不存在", dataVariable)
 	}
 
 	dataStr, ok := data.(string)
 	if !ok {
-		return ExecutionResult{Success: false}, fmt.Errorf("变量 %s 不是字符串类型", dataVariable)
+		return ExecutionResult{Success: false}, fmt.Errorf("变量 %s 不是字符串类型，实际类型: %T", dataVariable, data)
 	}
 
 	var decrypted string

@@ -1,7 +1,16 @@
 <template>
   <div v-if="visible" class="property-panel">
     <div class="panel-header">
-      <h4>{{ nodeLabel }} 属性</h4>
+      <h4 
+        @dblclick="startEditLabel" 
+        :contenteditable="isEditingLabel"
+        @blur="finishEditLabel"
+        @keydown.enter.prevent="finishEditLabel"
+        ref="labelRef"
+        class="editable-label"
+      >
+        {{ displayLabel }}
+      </h4>
       <button @click="$emit('close')" class="close-btn">✕</button>
     </div>
     <div class="panel-body">
@@ -211,7 +220,13 @@
         </div>
         <div class="form-item">
           <label>循环变量</label>
-          <input v-model="formData.variable" placeholder="i" />
+          <input v-model="formData.variable" placeholder="index" />
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">循环体内可通过 {index} 引用当前索引（从1开始）</small>
+        </div>
+        <div class="form-item">
+          <label>循环间隔(ms)</label>
+          <input v-model.number="formData.interval" type="number" placeholder="500" />
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">每次循环之间的等待时间</small>
         </div>
       </template>
 
@@ -319,6 +334,30 @@
         </div>
       </template>
 
+      <!-- 数据收集器 -->
+      <template v-if="nodeType === 'collect'">
+        <div class="form-item">
+          <label>数据来源</label>
+          <input v-model="formData.dataVariable" placeholder="变量名，如 data" />
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">输入变量名，不需要 {}</small>
+        </div>
+        <div class="form-item">
+          <label>保存文件</label>
+          <div style="display: flex; gap: 8px;">
+            <input v-model="formData.filePath" placeholder="选择文件" readonly style="flex: 1;" />
+            <button @click="selectCollectFile" type="button" style="padding: 8px 12px; border: 1px solid #d9d9d9; background: white; border-radius: 4px; cursor: pointer;">选择</button>
+          </div>
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">数据将追加到此文件</small>
+        </div>
+        <div class="form-item">
+          <label>数据格式</label>
+          <select v-model="formData.format">
+            <option value="jsonl">JSONL (每行一个JSON)</option>
+            <option value="text">文本 (每行追加)</option>
+          </select>
+        </div>
+      </template>
+
       <!-- 解密 -->
       <template v-if="nodeType === 'decrypt'">
         <div class="form-item">
@@ -403,15 +442,11 @@
         </div>
       </template>
     </div>
-    <div class="panel-footer">
-      <button @click="handleSave" class="save-btn">保存</button>
-      <button @click="$emit('close')" class="cancel-btn">取消</button>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed, nextTick } from 'vue'
 import { SelectDownloadDirectory, SelectJSONLFile, LoadJSONLFile } from '../../../wailsjs/go/main/NetworkApp'
 
 const props = defineProps<{
@@ -424,11 +459,24 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   save: [data: Record<string, any>]
+  updateLabel: [label: string]
 }>()
 
 const formData = ref<Record<string, any>>({})
 const availableKeys = ref<string[]>([])
 const totalLines = ref(0)
+const isEditingLabel = ref(false)
+const labelRef = ref<HTMLElement>()
+const displayLabel = computed(() => formData.value.customLabel || props.nodeLabel || '组件')
+
+let saveTimer: number | null = null
+watch(formData, (newData) => {
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = window.setTimeout(() => {
+    console.log('[PropertyPanel] formData 变化，自动保存:', newData)
+    emit('save', newData)
+  }, 300)
+}, { deep: true })
 
 watch(() => props.nodeData, (newData) => {
   console.log('[PropertyPanel] watch nodeData 变化:', newData)
@@ -468,6 +516,9 @@ watch(() => props.nodeData, (newData) => {
     if (!formData.value.dataFormat) {
       formData.value.dataFormat = 'text'
     }
+    if (!formData.value.format) {
+      formData.value.format = 'jsonl'
+    }
     if (props.nodeType === 'if') {
       if (!formData.value.operator) {
         formData.value.operator = '=='
@@ -484,7 +535,7 @@ watch(() => props.nodeData, (newData) => {
     formData.value = { selectorType: 'css', urlSource: 'direct', extractKeys: '*', interval: 100, openMode: 'current', overwriteMode: 'skip', algorithm: 'sm4-ecb', dataFormat: 'text' }
   }
   console.log('[PropertyPanel] formData 已更新:', formData.value)
-}, { immediate: true, deep: true })
+}, { immediate: true })
 
 async function selectDirectory() {
   try {
@@ -522,10 +573,39 @@ async function loadJSONLKeys() {
   }
 }
 
-function handleSave() {
-  console.log('[PropertyPanel] 保存节点数据:', props.nodeType, formData.value)
-  emit('save', formData.value)
-  emit('close')
+async function selectCollectFile() {
+  try {
+    const file = await SelectJSONLFile()
+    if (file) {
+      formData.value.filePath = file
+    }
+  } catch (error: any) {
+    console.error('[PropertyPanel] 选择文件失败:', error)
+  }
+}
+
+function startEditLabel() {
+  isEditingLabel.value = true
+  nextTick(() => {
+    if (labelRef.value) {
+      labelRef.value.focus()
+      const range = document.createRange()
+      range.selectNodeContents(labelRef.value)
+      const sel = window.getSelection()
+      sel?.removeAllRanges()
+      sel?.addRange(range)
+    }
+  })
+}
+
+function finishEditLabel() {
+  if (!isEditingLabel.value) return
+  isEditingLabel.value = false
+  const newLabel = labelRef.value?.textContent?.trim()
+  if (newLabel && newLabel !== displayLabel.value) {
+    formData.value.customLabel = newLabel
+    emit('updateLabel', newLabel)
+  }
 }
 </script>
 
@@ -565,6 +645,23 @@ function handleSave() {
   font-weight: 600;
 }
 
+.editable-label {
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.editable-label:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.editable-label[contenteditable="true"] {
+  outline: 2px solid #1890ff;
+  background: white;
+  cursor: text;
+}
+
 .close-btn {
   width: 24px;
   height: 24px;
@@ -584,6 +681,7 @@ function handleSave() {
   flex: 1;
   overflow-y: auto;
   padding: 16px;
+  padding-bottom: 16px;
 }
 
 .form-item {
@@ -613,40 +711,5 @@ function handleSave() {
 .form-item select:focus {
   outline: none;
   border-color: #1890ff;
-}
-
-.panel-footer {
-  padding: 16px;
-  border-top: 1px solid #e0e0e0;
-  display: flex;
-  gap: 8px;
-}
-
-.save-btn,
-.cancel-btn {
-  flex: 1;
-  padding: 8px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.save-btn {
-  background: #1890ff;
-  color: white;
-}
-
-.save-btn:hover {
-  background: #40a9ff;
-}
-
-.cancel-btn {
-  background: #f0f0f0;
-  color: #333;
-}
-
-.cancel-btn:hover {
-  background: #e0e0e0;
 }
 </style>

@@ -165,22 +165,11 @@ func (we *WorkflowExecutor) executeInterceptRequest(step ExecutionStep) (Executi
 		return result, err
 	}
 
-	// 如果是捕获数据模式，保存到变量
+	// 如果是捕获数据模式，等待数据被捕获
 	if action == "capture" && saveToVariable != "" && result.Success {
-		if capturedData, ok := result.Data["capturedData"]; ok {
-			// 转换数据格式
-			if dataFormat == "" {
-				dataFormat = "text"
-			}
-			converted, err := convertDataFormat(capturedData, dataFormat)
-			if err != nil {
-				log.Printf("[Workflow] 数据格式转换失败: %v", err)
-				we.variables[saveToVariable] = capturedData
-			} else {
-				we.variables[saveToVariable] = converted
-				log.Printf("[Workflow] ✓ 拦截数据已转换为 %s 格式并保存到变量: %s", dataFormat, saveToVariable)
-			}
-		}
+		log.Printf("[Workflow] 拦截规则已设置，等待请求被捕获...")
+		// 注意：这里只是设置了拦截规则，实际数据需要在后续步骤中通过浏览器扩展的事件获取
+		// 建议在拦截请求节点后添加：点击按钮 → 等待节点(1-2秒) → 使用捕获的数据
 	}
 
 	return result, nil
