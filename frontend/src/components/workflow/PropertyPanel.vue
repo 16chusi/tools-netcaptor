@@ -228,12 +228,27 @@
           <div style="display: flex; align-items: center; gap: 8px;">
             <label style="margin: 0; min-width: 80px;">拦截动作</label>
             <select v-model="formData.action" style="flex: 1;">
+              <option value="capture">捕获数据</option>
               <option value="block">阻断请求</option>
               <option value="mock">Mock响应</option>
               <option value="redirect">重定向</option>
               <option value="download">下载保存</option>
             </select>
           </div>
+        </div>
+        <div class="form-item" v-if="formData.action === 'capture'">
+          <label>数据格式</label>
+          <select v-model="formData.dataFormat">
+            <option value="text">文本 (Text)</option>
+            <option value="json">JSON</option>
+            <option value="hex">十六进制 (Hex)</option>
+          </select>
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">选择数据转换格式</small>
+        </div>
+        <div class="form-item" v-if="formData.action === 'capture'">
+          <label>保存到变量</label>
+          <input v-model="formData.saveToVariable" placeholder="responseData" />
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">后续节点可通过 {responseData} 引用</small>
         </div>
         <div class="form-item" v-if="formData.action === 'block'">
           <div style="display: flex; align-items: center; gap: 8px;">
@@ -301,6 +316,37 @@
             </select>
           </div>
           <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">相同内容的文件处理方式</small>
+        </div>
+      </template>
+
+      <!-- 解密 -->
+      <template v-if="nodeType === 'decrypt'">
+        <div class="form-item">
+          <label>数据来源</label>
+          <input v-model="formData.dataVariable" placeholder="变量名，如 data" />
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">输入变量名，不需要 {}</small>
+        </div>
+        <div class="form-item">
+          <label>解密算法</label>
+          <select v-model="formData.algorithm">
+            <option value="sm4-ecb">SM4-ECB</option>
+            <option value="sm4-cbc">SM4-CBC</option>
+          </select>
+        </div>
+        <div class="form-item">
+          <label>密钥 (Hex)</label>
+          <input v-model="formData.key" placeholder="46696e32416e63304571753245727934" />
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">16进制格式的密钥</small>
+        </div>
+        <div class="form-item" v-if="formData.algorithm === 'sm4-cbc'">
+          <label>IV向量 (Hex)</label>
+          <input v-model="formData.iv" placeholder="可选，留空使用零向量" />
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">16进制格式的初始化向量</small>
+        </div>
+        <div class="form-item">
+          <label>保存到变量</label>
+          <input v-model="formData.saveToVariable" placeholder="decryptedData" />
+          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">后续节点可通过 {decryptedData} 引用</small>
         </div>
       </template>
 
@@ -416,6 +462,12 @@ watch(() => props.nodeData, (newData) => {
     if (!formData.value.overwriteMode) {
       formData.value.overwriteMode = 'skip'
     }
+    if (!formData.value.algorithm) {
+      formData.value.algorithm = 'sm4-ecb'
+    }
+    if (!formData.value.dataFormat) {
+      formData.value.dataFormat = 'text'
+    }
     if (props.nodeType === 'if') {
       if (!formData.value.operator) {
         formData.value.operator = '=='
@@ -429,7 +481,7 @@ watch(() => props.nodeData, (newData) => {
     }
 
   } else {
-    formData.value = { selectorType: 'css', urlSource: 'direct', extractKeys: '*', interval: 100, openMode: 'current', overwriteMode: 'skip' }
+    formData.value = { selectorType: 'css', urlSource: 'direct', extractKeys: '*', interval: 100, openMode: 'current', overwriteMode: 'skip', algorithm: 'sm4-ecb', dataFormat: 'text' }
   }
   console.log('[PropertyPanel] formData 已更新:', formData.value)
 }, { immediate: true, deep: true })

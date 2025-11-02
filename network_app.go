@@ -75,9 +75,7 @@ func (na *NetworkApp) GetAllResponses() []NetworkResponse {
 
 // 获取所有条目(合并请求和响应)
 func (na *NetworkApp) GetAllEntries() []NetworkEntry {
-	entries := na.capture.GetEntries()
-	log.Printf("[GetAllEntries] 返回条数: %d", len(entries))
-	return entries
+	return na.capture.GetEntries()
 }
 
 // 清空记录

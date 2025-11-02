@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -133,26 +135,89 @@ func (we *WorkflowExecutor) executeInterceptRequest(step ExecutionStep) (Executi
 	redirectUrl, _ := step.Params["redirectUrl"].(string)
 	saveDirectory, _ := step.Params["saveDirectory"].(string)
 	fileExtension, _ := step.Params["fileExtension"].(string)
+	dataFormat, _ := step.Params["dataFormat"].(string)
+	saveToVariable, _ := step.Params["saveToVariable"].(string)
 	statusCode := 403
 	if sc, ok := step.Params["statusCode"].(float64); ok {
 		statusCode = int(sc)
 	}
 
-	log.Printf("[Workflow] 设置请求拦截: urlPattern=%s, action=%s, saveDirectory=%s, fileExtension=%s", urlPattern, action, saveDirectory, fileExtension)
+	log.Printf("[Workflow] 设置请求拦截: urlPattern=%s, action=%s, dataFormat=%s, saveToVariable=%s", urlPattern, action, dataFormat, saveToVariable)
 
 	msg := WSMessage{
 		Type: "setup_intercept",
 		Data: map[string]interface{}{
-			"urlPattern":    urlPattern,
-			"action":        action,
-			"mockResponse":  mockResponse,
-			"redirectUrl":   redirectUrl,
-			"saveDirectory": saveDirectory,
-			"fileExtension": fileExtension,
-			"statusCode":    statusCode,
+			"urlPattern":     urlPattern,
+			"action":         action,
+			"mockResponse":   mockResponse,
+			"redirectUrl":    redirectUrl,
+			"saveDirectory":  saveDirectory,
+			"fileExtension":  fileExtension,
+			"statusCode":     statusCode,
+			"dataFormat":     dataFormat,
+			"saveToVariable": saveToVariable,
 		},
 	}
 	log.Printf("[Workflow] 发送 WebSocket 消息: %+v", msg.Data)
 
-	return we.sendAndWait(msg, 10*time.Second, "setup_intercept")
+	result, err := we.sendAndWait(msg, 10*time.Second, "setup_intercept")
+	if err != nil {
+		return result, err
+	}
+
+	// 如果是捕获数据模式，保存到变量
+	if action == "capture" && saveToVariable != "" && result.Success {
+		if capturedData, ok := result.Data["capturedData"]; ok {
+			// 转换数据格式
+			if dataFormat == "" {
+				dataFormat = "text"
+			}
+			converted, err := convertDataFormat(capturedData, dataFormat)
+			if err != nil {
+				log.Printf("[Workflow] 数据格式转换失败: %v", err)
+				we.variables[saveToVariable] = capturedData
+			} else {
+				we.variables[saveToVariable] = converted
+				log.Printf("[Workflow] ✓ 拦截数据已转换为 %s 格式并保存到变量: %s", dataFormat, saveToVariable)
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// convertDataFormat 转换数据格式
+func convertDataFormat(data interface{}, format string) (string, error) {
+	var dataStr string
+	switch v := data.(type) {
+	case string:
+		dataStr = v
+	case []byte:
+		dataStr = string(v)
+	default:
+		jsonBytes, err := json.Marshal(data)
+		if err != nil {
+			return "", fmt.Errorf("数据序列化失败: %w", err)
+		}
+		dataStr = string(jsonBytes)
+	}
+
+	switch format {
+	case "hex":
+		return hex.EncodeToString([]byte(dataStr)), nil
+	case "json":
+		var jsonData interface{}
+		if err := json.Unmarshal([]byte(dataStr), &jsonData); err != nil {
+			return "", fmt.Errorf("JSON解析失败: %w", err)
+		}
+		formatted, err := json.Marshal(jsonData)
+		if err != nil {
+			return "", fmt.Errorf("JSON格式化失败: %w", err)
+		}
+		return string(formatted), nil
+	case "text":
+		fallthrough
+	default:
+		return dataStr, nil
+	}
 }

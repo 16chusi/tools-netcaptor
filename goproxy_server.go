@@ -5,7 +5,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -20,7 +19,7 @@ type GoProxyServer struct {
 	capture     *NetworkCapture
 	interceptor *Interceptor
 	running     bool
-	requestMap  map[string]int64
+	requestMap  map[string]*NetworkRequest
 }
 
 func NewGoProxyServer(port int, capture *NetworkCapture) *GoProxyServer {
@@ -32,7 +31,7 @@ func NewGoProxyServer(port int, capture *NetworkCapture) *GoProxyServer {
 		proxy:       proxy,
 		capture:     capture,
 		interceptor: NewInterceptor(),
-		requestMap:  make(map[string]int64),
+		requestMap:  make(map[string]*NetworkRequest),
 	}
 
 	// 启用HTTPS MITM
@@ -110,8 +109,6 @@ func (gps *GoProxyServer) recordRequest(req *http.Request) {
 	}
 
 	reqID := generateID()
-	gps.requestMap[url] = time.Now().UnixMilli()
-
 	reqData := NetworkRequest{
 		ID:      reqID,
 		URL:     url,
@@ -123,6 +120,9 @@ func (gps *GoProxyServer) recordRequest(req *http.Request) {
 		Domain:  req.Host,
 		Path:    req.URL.Path,
 	}
+
+	// 保存到 requestMap 以便响应时查找
+	gps.requestMap[url] = &reqData
 
 	gps.capture.mu.Lock()
 	gps.capture.requests = append(gps.capture.requests, reqData)
@@ -155,11 +155,24 @@ func (gps *GoProxyServer) recordResponse(req *http.Request, resp *http.Response)
 
 	contentType := resp.Header.Get("Content-Type")
 
-	// 计算耗时
+	// 从 requestMap 查找请求信息
+	var reqData NetworkRequest
 	var duration int64 = 0
-	if startTime, ok := gps.requestMap[url]; ok {
-		duration = time.Now().UnixMilli() - startTime
+	if reqPtr, ok := gps.requestMap[url]; ok {
+		reqData = *reqPtr
+		duration = time.Now().UnixMilli() - reqData.Time
 		delete(gps.requestMap, url)
+	} else {
+		// 如果 requestMap 中没有，创建一个默认请求
+		reqData = NetworkRequest{
+			ID:     generateID(),
+			URL:    url,
+			Method: req.Method,
+			Type:   "proxy",
+			Time:   time.Now().UnixMilli(),
+			Domain: req.Host,
+			Path:   req.URL.Path,
+		}
 	}
 
 	respData := NetworkResponse{
@@ -177,17 +190,8 @@ func (gps *GoProxyServer) recordResponse(req *http.Request, resp *http.Response)
 	gps.capture.mu.Lock()
 	gps.capture.responses = append(gps.capture.responses, respData)
 
-	// 查找对应的请求并创建 NetworkEntry
-	var reqData NetworkRequest
-	for i := len(gps.capture.requests) - 1; i >= 0; i-- {
-		if gps.capture.requests[i].URL == url {
-			reqData = gps.capture.requests[i]
-			break
-		}
-	}
-
-	// 添加到 entries 列表
-	if reqData.URL != "" {
+	// 总是创建 entry
+	if true {
 		entry := NetworkEntry{
 			ID:         reqData.ID,
 			URL:        url,
@@ -209,7 +213,6 @@ func (gps *GoProxyServer) recordResponse(req *http.Request, resp *http.Response)
 	// 限制历史记录数量，保留最近30条
 	if len(gps.capture.entries) > gps.capture.maxEntries {
 		gps.capture.entries = gps.capture.entries[len(gps.capture.entries)-gps.capture.maxEntries:]
-		log.Printf("[GoProxy] entries 被限制为 %d 条", len(gps.capture.entries))
 	}
 	if len(gps.capture.requests) > gps.capture.maxEntries {
 		gps.capture.requests = gps.capture.requests[len(gps.capture.requests)-gps.capture.maxEntries:]

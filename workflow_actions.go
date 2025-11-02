@@ -29,6 +29,8 @@ func (we *WorkflowExecutor) executeStep(step ExecutionStep) (ExecutionResult, er
 		return we.executeInterceptRequest(step)
 	case "download_captured":
 		return we.executeDownloadCaptured(step)
+	case "decrypt":
+		return we.executeDecrypt(step)
 	case "jsonl_reader":
 		return ExecutionResult{Success: false}, fmt.Errorf("jsonl_reader 节点不应该通过 executeStep 执行")
 	case "if":

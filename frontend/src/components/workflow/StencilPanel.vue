@@ -128,6 +128,7 @@ defineExpose({
   -ms-user-select: none;
   position: relative;
   z-index: 10;
+  overflow-y: auto;
 }
 
 .stencil-panel :deep(.x6-widget-stencil) {

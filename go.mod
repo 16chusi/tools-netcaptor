@@ -9,6 +9,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/playwright-community/playwright-go v0.5200.1
+	github.com/tjfoc/gmsm v1.4.1
 	github.com/wailsapp/wails/v2 v2.10.2
 )
 

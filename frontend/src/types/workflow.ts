@@ -39,6 +39,7 @@ export type NodeType =
   | 'jsonl_reader'
   | 'intercept_request'
   | 'download_captured'
+  | 'decrypt'
 
 export interface NodeConfig {
   type: NodeType
