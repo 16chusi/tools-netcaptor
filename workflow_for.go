@@ -3,14 +3,37 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 )
 
 // executeFor 执行for循环
 func (we *WorkflowExecutor) executeFor(step ExecutionStep, task WorkflowTask, stepCount int) error {
-	count, ok := step.Params["count"].(float64)
-	if !ok || count <= 0 {
+	return we.executeForWithDepth(step, task, stepCount, 0)
+}
+
+// executeForWithDepth 执行for循环（支持嵌套深度控制）
+func (we *WorkflowExecutor) executeForWithDepth(step ExecutionStep, task WorkflowTask, stepCount int, depth int) error {
+	var count float64
+	var ok bool
+
+	// 尝试从 float64 获取循环次数
+	if count, ok = step.Params["count"].(float64); ok {
+		// 数字类型，直接使用
+	} else if countStr, isStr := step.Params["count"].(string); isStr {
+		// 字符串类型，可能包含变量，先替换变量再转换
+		replacedStr := we.replaceVariablesInString(countStr)
+		if parsedCount, err := strconv.ParseFloat(replacedStr, 64); err == nil {
+			count = parsedCount
+		} else {
+			return fmt.Errorf("循环次数无法解析为数字: %s", replacedStr)
+		}
+	} else {
 		return fmt.Errorf("缺少有效的循环次数")
+	}
+
+	if count <= 0 {
+		return fmt.Errorf("循环次数必须大于0，当前值: %v", count)
 	}
 
 	variable, _ := step.Params["variable"].(string)
@@ -24,7 +47,7 @@ func (we *WorkflowExecutor) executeFor(step ExecutionStep, task WorkflowTask, st
 	}
 
 	loopCount := int(count)
-	log.Printf("[Workflow] For循环: 次数=%d, 变量=%s, 间隔=%dms", loopCount, variable, interval)
+	log.Printf("[Workflow] For循环 (深度:%d): 次数=%d, 变量=%s, 间隔=%dms", depth, loopCount, variable, interval)
 
 	nextNodeID := we.findNextNode(task, step.NodeID, "")
 	if nextNodeID == "" {
@@ -36,13 +59,13 @@ func (we *WorkflowExecutor) executeFor(step ExecutionStep, task WorkflowTask, st
 			return fmt.Errorf("执行已停止")
 		}
 
-		log.Printf("[Workflow] ========== 循环第 %d/%d 次 ==========", i, loopCount)
+		log.Printf("[Workflow] ========== 循环第 %d/%d 次 (深度:%d) ==========", i, loopCount, depth)
 
 		we.variables[variable] = i
 		log.Printf("[Workflow] ✓ 变量已设置: %s = %d", variable, i)
 		we.printAllVariables()
 
-		if err := we.executeLoopBody(task, nextNodeID, stepCount); err != nil {
+		if err := we.executeLoopBodyWithDepth(task, nextNodeID, stepCount, depth); err != nil {
 			return fmt.Errorf("循环第 %d 次失败: %w", i, err)
 		}
 
@@ -51,7 +74,7 @@ func (we *WorkflowExecutor) executeFor(step ExecutionStep, task WorkflowTask, st
 		}
 	}
 
-	log.Printf("[Workflow] For循环执行完成，共循环 %d 次", loopCount)
+	log.Printf("[Workflow] For循环执行完成 (深度:%d)，共循环 %d 次", depth, loopCount)
 	return nil
 }
 

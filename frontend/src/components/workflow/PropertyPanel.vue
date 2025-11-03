@@ -26,6 +26,7 @@
         <div class="form-item">
           <label>元素选择器</label>
           <input v-model="formData.selector" :placeholder="formData.selectorType === 'xpath' ? '//*[@id=&quot;btn&quot;]' : '#id 或 .class'" />
+          <div class="variable-hint">💡 支持变量: {变量名} 或 {变量名.字段名}，如 #btn-{index} 或 [data-id='{data.id}']</div>
         </div>
         <div class="form-item">
           <label>等待元素出现(ms)</label>
@@ -45,10 +46,12 @@
         <div class="form-item">
           <label>元素选择器</label>
           <input v-model="formData.selector" :placeholder="formData.selectorType === 'xpath' ? '//*[@id=&quot;username&quot;]' : '#username'" />
+          <div class="variable-hint">💡 支持变量: {变量名} 或 {变量名.字段名}，如 #user-{index} 或 [data-name='{data.name}']</div>
         </div>
         <div class="form-item">
           <label>输入内容</label>
           <input v-model="formData.text" placeholder="要输入的文本" />
+          <div class="variable-hint">💡 支持变量: {变量名} 或 {变量名.字段名}，如 {data.name} 或 用户: {data.username}</div>
         </div>
       </template>
 
@@ -59,7 +62,7 @@
             <label style="margin: 0; min-width: 80px;">目标URL</label>
             <input v-model="formData.url" placeholder="https://example.com 或 {url}" style="flex: 1;" />
           </div>
-          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">支持变量引用，如 {url} 或 {data.url}</small>
+          <div class="variable-hint">💡 支持变量: {变量名} 或 {变量名.字段名}，如 {url} 或 {data.website}</div>
         </div>
         <div class="form-item">
           <div style="display: flex; align-items: center; gap: 8px;">
@@ -93,6 +96,7 @@
         <div class="form-item" v-if="formData.urlSource === 'direct'">
           <label>下载URL</label>
           <input v-model="formData.downloadUrl" placeholder="https://example.com/file.pdf" />
+          <div class="variable-hint">💡 支持变量: {变量名} 或 {变量名.字段名}，如 {data.fileUrl} 或 {downloadLink}</div>
         </div>
         <div class="form-item" v-if="formData.urlSource === 'variable'">
           <label>变量名</label>
@@ -102,7 +106,7 @@
         <div class="form-item" v-if="formData.urlSource === 'template'">
           <label>URL模板</label>
           <input v-model="formData.urlTemplate" placeholder="https://example.com/{id}/file.pdf" />
-          <small style="color: #999; font-size: 11px;">使用 {变量名} 引用变量</small>
+          <div class="variable-hint">💡 支持变量: {变量名} 或 {变量名.字段名}，如 {data.id} 或 {index}</div>
         </div>
 
         <div class="form-item">
@@ -126,6 +130,7 @@
         <div class="form-item">
           <label>元素选择器</label>
           <input v-model="formData.selector" :placeholder="formData.selectorType === 'xpath' ? '//*[@class=&quot;item&quot;]' : '.item'" />
+          <div class="variable-hint">💡 支持变量: {变量名} 或 {变量名.字段名}，如 .item-{index} 或 [data-page='{page}']</div>
         </div>
         <div class="form-item">
           <label>提取属性</label>
@@ -148,6 +153,7 @@
         <div class="form-item">
           <label>左值</label>
           <input v-model="formData.leftValue" placeholder="{变量} 或 固定值" />
+          <div class="variable-hint">💡 支持变量: {变量名} 或 {变量名.字段名}，如 {data.status} 或 {index}</div>
         </div>
         <div class="form-item">
           <label>运算符</label>
@@ -167,6 +173,7 @@
         <div class="form-item">
           <label>右值</label>
           <input v-model="formData.rightValue" placeholder="{变量} 或 固定值" />
+          <div class="variable-hint">💡 支持变量: {变量名} 或 {变量名.字段名}，如 {data.expected} 或 "完成"</div>
         </div>
         <div class="form-item">
           <label>True 分支端口</label>
@@ -216,7 +223,8 @@
       <template v-if="nodeType === 'for'">
         <div class="form-item">
           <label>循环次数</label>
-          <input v-model.number="formData.count" type="number" placeholder="10" />
+          <input v-model="formData.count" placeholder="10 或 {maxCount}" />
+          <div class="variable-hint">💡 支持变量: {变量名} 或 {变量名.字段名}，如 {data.totalPages} 或 {maxCount}</div>
         </div>
         <div class="form-item">
           <label>循环变量</label>
@@ -274,13 +282,14 @@
         <div class="form-item" v-if="formData.action === 'mock'">
           <label>Mock响应内容</label>
           <textarea v-model="formData.mockResponse" placeholder='{"success":true}' style="width: 100%; min-height: 100px; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; font-family: monospace; font-size: 12px;"></textarea>
-          <small style="color: #999; font-size: 11px; display: block; margin-top: 4px;">JSON格式</small>
+          <div class="variable-hint">💡 支持变量: {变量名} 或 {变量名.字段名}，如 {"data": "{data.result}", "status": "{status}"}</div>
         </div>
         <div class="form-item" v-if="formData.action === 'redirect'">
           <div style="display: flex; align-items: center; gap: 8px;">
             <label style="margin: 0; min-width: 80px;">重定向URL</label>
             <input v-model="formData.redirectUrl" placeholder="https://example.com/api" style="flex: 1;" />
           </div>
+          <div class="variable-hint">💡 支持变量: {变量名} 或 {变量名.字段名}，如 {data.newUrl} 或 https://api.com/{data.id}</div>
         </div>
         <div class="form-item" v-if="formData.action === 'download'">
           <label>保存目录</label>
@@ -711,5 +720,17 @@ function finishEditLabel() {
 .form-item select:focus {
   outline: none;
   border-color: #1890ff;
+}
+
+.variable-hint {
+  font-size: 11px;
+  color: #666;
+  margin-top: 4px;
+  line-height: 1.4;
+  background: #f8f9fa;
+  padding: 4px 8px;
+  border-radius: 3px;
+  border-left: 3px solid #1890ff;
+  text-align: left;
 }
 </style>

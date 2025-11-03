@@ -9,6 +9,11 @@ import (
 
 // executeJSONLReader 执行JSONL读取器
 func (we *WorkflowExecutor) executeJSONLReader(step ExecutionStep, task WorkflowTask, stepCount int) error {
+	return we.executeJSONLReaderWithDepth(step, task, stepCount, 0)
+}
+
+// executeJSONLReaderWithDepth 执行JSONL读取器（支持嵌套深度控制）
+func (we *WorkflowExecutor) executeJSONLReaderWithDepth(step ExecutionStep, task WorkflowTask, stepCount int, depth int) error {
 	// 获取文件路径
 	filePath, ok := step.Params["filePath"].(string)
 	if !ok || filePath == "" {
@@ -98,7 +103,7 @@ func (we *WorkflowExecutor) executeJSONLReader(step ExecutionStep, task Workflow
 		log.Printf("[Workflow] ✓ 变量已保存: %s = %v", saveToVariable, extractedData)
 
 		// 执行循环体（从下一个节点开始，直到结束节点）
-		if err := we.executeLoopBody(task, nextNodeID, stepCount); err != nil {
+		if err := we.executeLoopBodyWithDepth(task, nextNodeID, stepCount, depth); err != nil {
 			return fmt.Errorf("执行第 %d 行时失败: %w", i+1, err)
 		}
 
@@ -114,6 +119,17 @@ func (we *WorkflowExecutor) executeJSONLReader(step ExecutionStep, task Workflow
 
 // executeLoopBody 执行循环体（从当前节点到结束节点）
 func (we *WorkflowExecutor) executeLoopBody(task WorkflowTask, startNodeID string, baseStepCount int) error {
+	return we.executeLoopBodyWithDepth(task, startNodeID, baseStepCount, 0)
+}
+
+// executeLoopBodyWithDepth 执行循环体（支持嵌套深度控制）
+func (we *WorkflowExecutor) executeLoopBodyWithDepth(task WorkflowTask, startNodeID string, baseStepCount int, depth int) error {
+	const MAX_NEST_DEPTH = 5 // 最大嵌套深度
+
+	if depth > MAX_NEST_DEPTH {
+		return fmt.Errorf("嵌套循环深度超过限制: %d", MAX_NEST_DEPTH)
+	}
+
 	currentNodeID := startNodeID
 	stepCount := baseStepCount
 
@@ -140,7 +156,7 @@ func (we *WorkflowExecutor) executeLoopBody(task WorkflowTask, startNodeID strin
 		}
 
 		stepCount++
-		log.Printf("[Workflow] 循环体步骤 %d: %s", stepCount, node.Type)
+		log.Printf("[Workflow] 循环体步骤 %d (深度:%d): %s", stepCount, depth, node.Type)
 
 		we.emitStatus(ExecutionStatus{
 			TaskID:      task.ID,
@@ -149,6 +165,54 @@ func (we *WorkflowExecutor) executeLoopBody(task WorkflowTask, startNodeID strin
 			Status:      "running",
 			CurrentNode: currentNodeID,
 		})
+
+		// for 节点特殊处理 - 支持嵌套
+		if node.Type == "for" {
+			paramsCopy := make(map[string]interface{})
+			for k, v := range node.Data {
+				paramsCopy[k] = v
+			}
+			step := ExecutionStep{
+				NodeID: currentNodeID,
+				Action: node.Type,
+				Params: paramsCopy,
+			}
+			we.replaceVariables(&step)
+
+			log.Printf("[Workflow] 执行嵌套for循环 (深度:%d)", depth+1)
+			err := we.executeForWithDepth(step, task, stepCount, depth+1)
+			if err != nil {
+				return fmt.Errorf("嵌套for循环执行失败: %w", err)
+			}
+
+			// 查找下一个节点
+			currentNodeID = we.findNextNode(task, currentNodeID, "")
+			continue
+		}
+
+		// jsonl_reader 节点特殊处理 - 支持嵌套
+		if node.Type == "jsonl_reader" {
+			paramsCopy := make(map[string]interface{})
+			for k, v := range node.Data {
+				paramsCopy[k] = v
+			}
+			step := ExecutionStep{
+				NodeID: currentNodeID,
+				Action: node.Type,
+				Params: paramsCopy,
+			}
+			we.replaceVariables(&step)
+
+			log.Printf("[Workflow] 执行嵌套JSONL读取器 (深度:%d)", depth+1)
+			err := we.executeJSONLReaderWithDepth(step, task, stepCount, depth+1)
+			if err != nil {
+				return fmt.Errorf("嵌套JSONL读取器执行失败: %w", err)
+			}
+
+			// 查找下一个节点
+			currentNodeID = we.findNextNode(task, currentNodeID, "")
+			continue
+		}
 
 		// if 节点特殊处理 - 深拷贝 Params
 		if node.Type == "if" {

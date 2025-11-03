@@ -13,6 +13,7 @@ func (we *WorkflowExecutor) replaceVariables(step *ExecutionStep) {
 		if strVal, ok := value.(string); ok {
 			step.Params[key] = we.replaceVariablesInString(strVal)
 		}
+		// 数字类型的变量替换在各个具体函数中处理
 	}
 }
 
