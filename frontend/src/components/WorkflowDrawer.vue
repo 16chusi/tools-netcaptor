@@ -18,6 +18,7 @@
           :runningTaskId="runningTaskId"
           @select="selectTask"
           @create="createTask"
+          @copy="copyTask"
           @delete="deleteTask"
           @rename="renameTask"
           @run="runTask"
@@ -130,6 +131,32 @@ async function createTask() {
   } catch (error: any) {
     console.error('[WorkflowDrawer] 创建任务失败:', error)
     toast.error('创建失败: ' + error.message)
+  }
+}
+
+async function copyTask(id: string) {
+  const sourceTask = tasks.value.find(t => t.id === id)
+  if (!sourceTask) return
+  
+  const taskData = {
+    id: Date.now().toString(),
+    name: `${sourceTask.name} - 副本`,
+    description: sourceTask.description,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    nodes: JSON.parse(JSON.stringify(sourceTask.nodes)), // 深拷贝
+    edges: JSON.parse(JSON.stringify(sourceTask.edges))  // 深拷贝
+  }
+  
+  try {
+    const newTask = main.WorkflowTask.createFrom(taskData)
+    await SaveWorkflowTask(newTask)
+    tasks.value.push(taskData)
+    selectedTaskId.value = taskData.id
+    toast.success('任务复制成功')
+  } catch (error: any) {
+    console.error('[WorkflowDrawer] 复制任务失败:', error)
+    toast.error('复制失败: ' + error.message)
   }
 }
 

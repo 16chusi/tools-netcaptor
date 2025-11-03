@@ -29,6 +29,11 @@
         </div>
         <div class="task-actions">
           <button 
+            @click.stop="$emit('copy', task.id)" 
+            class="action-btn copy"
+            title="复制任务"
+          >📋</button>
+          <button 
             v-if="runningTaskId === task.id"
             @click.stop="$emit('stop', task.id)" 
             class="action-btn stop"
@@ -68,6 +73,7 @@ defineProps<{
 const emit = defineEmits<{
   select: [id: string]
   create: []
+  copy: [id: string]
   delete: [id: string]
   rename: [id: string, name: string]
   run: [id: string]
@@ -221,6 +227,14 @@ function cancelEdit() {
 
 .action-btn.run:hover:not(:disabled) {
   background: #f6ffed;
+}
+
+.action-btn.copy {
+  color: #1890ff;
+}
+
+.action-btn.copy:hover {
+  background: #e6f7ff;
 }
 
 .action-btn.stop {
