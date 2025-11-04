@@ -1,6 +1,9 @@
 <template>
-  <div class="stencil-panel">
-    <div class="stencil-header">组件</div>
+  <div v-if="visible" class="stencil-panel" :style="{ left: position.x + 'px', top: position.y + 'px' }">
+    <div class="stencil-header" @mousedown="startDrag">
+      <span>组件</span>
+      <button @click="$emit('close')" class="close-btn">✕</button>
+    </div>
     <div class="stencil-groups">
       <div v-for="group in groups" :key="group.name" class="group">
         <div class="group-title" @click="toggleGroup(group.name)">
@@ -32,12 +35,42 @@ import type { NodeConfig } from '../../types/workflow'
 
 const props = defineProps<{
   graph: any
+  visible: boolean
+}>()
+
+const emit = defineEmits<{
+  close: []
 }>()
 
 const groups = NODE_GROUPS
 const expandedGroups = reactive<Record<string, boolean>>(
   Object.fromEntries(groups.map(g => [g.name, true]))
 )
+
+const position = ref({ x: 10, y: 10 })
+const isDragging = ref(false)
+
+function startDrag(e: MouseEvent) {
+  if ((e.target as HTMLElement).closest('.close-btn')) return
+  
+  isDragging.value = true
+  const startX = e.clientX - position.value.x
+  const startY = e.clientY - position.value.y
+  
+  function onMouseMove(e: MouseEvent) {
+    position.value.x = e.clientX - startX
+    position.value.y = e.clientY - startY
+  }
+  
+  function onMouseUp() {
+    isDragging.value = false
+    document.removeEventListener('mousemove', onMouseMove)
+    document.removeEventListener('mouseup', onMouseUp)
+  }
+  
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup', onMouseUp)
+}
 
 function toggleGroup(name: string) {
   expandedGroups[name] = !expandedGroups[name]
@@ -108,11 +141,16 @@ function onDragStart(event: DragEvent, config: NodeConfig) {
 
 <style scoped>
 .stencil-panel {
+  position: absolute;
   width: 200px;
-  border-right: 1px solid #e0e0e0;
+  max-height: calc(100vh - 200px);
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
   background: white;
   user-select: none;
   overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1001;
 }
 
 .stencil-header {
@@ -121,6 +159,31 @@ function onDragStart(event: DragEvent, config: NodeConfig) {
   padding: 12px 16px;
   font-size: 13px;
   font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 6px 6px 0 0;
+  cursor: move;
+}
+
+.close-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  font-size: 14px;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #e8eaed;
+  color: #333;
 }
 
 .stencil-groups {

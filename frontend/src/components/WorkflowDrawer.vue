@@ -4,6 +4,9 @@
       <div class="drawer-header">
         <h3>🔄 任务流编排</h3>
         <div class="header-controls">
+          <button v-if="currentTask" @click="toggleStencil" class="stencil-toggle-btn">
+            {{ stencilVisible ? '📦 隐藏组件' : '📦 显示组件' }}
+          </button>
           <button @click="toggleWebSocket" :class="['ws-btn', wsRunning ? 'danger' : 'success']">
             {{ wsRunning ? '⏹️ 停止服务' : '▶️ 启动服务' }}
           </button>
@@ -12,6 +15,13 @@
         </div>
       </div>
       <div class="drawer-content">
+        <StencilPanel 
+          v-if="currentTask" 
+          ref="stencilRef" 
+          :graph="graphInstance" 
+          :visible="stencilVisible"
+          @close="stencilVisible = false"
+        />
         <TaskList
           :tasks="tasks"
           :selectedTaskId="selectedTaskId"
@@ -26,7 +36,6 @@
         />
         <div class="editor-area">
           <div class="canvas-wrapper">
-            <StencilPanel v-if="currentTask" ref="stencilRef" :graph="graphInstance" />
             <FlowCanvas
               ref="canvasRef"
               :task="currentTask"
@@ -83,6 +92,7 @@ const emit = defineEmits<{
 const wsRunning = ref(false)
 const wsPort = ref(0)
 const runningTaskId = ref<string>()
+const stencilVisible = ref(false)
 
 const tasks = ref<WorkflowTask[]>([])
 const selectedTaskId = ref<string>()
@@ -407,6 +417,10 @@ async function toggleWebSocket() {
   }
 }
 
+function toggleStencil() {
+  stencilVisible.value = !stencilVisible.value
+}
+
 async function copyPort() {
   try {
     await navigator.clipboard.writeText(wsPort.value.toString())
@@ -466,6 +480,21 @@ async function copyPort() {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.stencil-toggle-btn {
+  padding: 6px 12px;
+  border: 1px solid #d9d9d9;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.stencil-toggle-btn:hover {
+  background: #f5f5f5;
+  border-color: #40a9ff;
 }
 
 .ws-btn {
