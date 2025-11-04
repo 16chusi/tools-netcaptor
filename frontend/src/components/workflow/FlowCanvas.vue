@@ -419,6 +419,9 @@ function createDefaultNodes() {
 function loadTask(task: WorkflowTask) {
   if (!graph) return
 
+  isLoading = true // 设置加载标志
+  console.log('[FlowCanvas] 开始加载任务:', task.id)
+  
   graph.clearCells()
 
   if (task.nodes.length === 0) {
@@ -570,6 +573,12 @@ function loadTask(task: WorkflowTask) {
       console.log('[FlowCanvas] 已加载', task.edges.length, '条边')
     }
   }
+  
+  // 清除加载标志，允许后续的变化事件
+  setTimeout(() => {
+    isLoading = false
+    console.log('[FlowCanvas] 任务加载完成，恢复变化监听')
+  }, 100)
 }
 
 function showContextMenu(cell: any, clientX: number, clientY: number) {
@@ -635,11 +644,20 @@ function getStatusText(status: string): string {
 }
 
 let isEmitting = false
+let emitTimer: number | null = null
+let lastEmitData: string | null = null
+let isLoading = false // 添加加载标志
+
 function emitChange() {
-  if (!graph || !props.task || isEmitting) return
+  if (!graph || !props.task || isEmitting || isLoading) return // 加载时不触发变化事件
   
-  isEmitting = true
-  setTimeout(() => {
+  // 防抖：清除之前的定时器
+  if (emitTimer) {
+    clearTimeout(emitTimer)
+  }
+  
+  emitTimer = window.setTimeout(() => {
+    isEmitting = true
     console.log('[FlowCanvas] ========== emitChange 开始 ==========')
     
     const nodes = graph!.getNodes().map((node, index) => {
@@ -683,11 +701,21 @@ function emitChange() {
       nodes,
       edges
     }
+    
+    // 数据去重：检查是否与上次发送的数据相同
+    const currentData = JSON.stringify({ nodes, edges })
+    if (currentData === lastEmitData) {
+      console.log('[FlowCanvas] 数据未变化，跳过发送')
+      isEmitting = false
+      return
+    }
+    
+    lastEmitData = currentData
     console.log('[FlowCanvas] 发送 change 事件:', updatedTask)
     emit('change', updatedTask)
     
     isEmitting = false
-  }, 0)
+  }, 300) // 增加防抖时间到300ms
 }
 </script>
 

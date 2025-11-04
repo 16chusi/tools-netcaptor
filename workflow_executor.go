@@ -110,17 +110,19 @@ func (we *WorkflowExecutor) executeFromNode(task WorkflowTask, nodeID string, st
 
 	// jsonl_reader 节点特殊处理
 	if node.Type == "jsonl_reader" {
+		log.Printf("[工作流执行器] 发现JSONL读取器节点: %s", nodeID)
 		step := ExecutionStep{
 			NodeID: nodeID,
 			Action: node.Type,
 			Params: node.Data,
 		}
 		we.replaceVariables(&step)
+		log.Printf("[工作流执行器] 准备执行JSONL读取器，参数: %+v", step.Params)
 
 		err := we.executeJSONLReader(step, task, stepCount)
 		if err != nil {
 			errMsg := fmt.Sprintf("步骤执行失败: %v", err)
-			log.Printf("[Workflow] %s", errMsg)
+			log.Printf("[工作流执行器] JSONL读取器执行失败: %s", errMsg)
 			we.emitStatus(ExecutionStatus{
 				TaskID:       task.ID,
 				CurrentStep:  stepCount,

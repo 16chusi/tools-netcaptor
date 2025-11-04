@@ -479,7 +479,12 @@ const labelRef = ref<HTMLElement>()
 const displayLabel = computed(() => formData.value.customLabel || props.nodeLabel || '组件')
 
 let saveTimer: number | null = null
+let isUpdatingFromProps = false // 添加标志防止循环
+
 watch(formData, (newData) => {
+  // 如果是从props更新的，不触发保存
+  if (isUpdatingFromProps) return
+  
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = window.setTimeout(() => {
     console.log('[PropertyPanel] formData 变化，自动保存:', newData)
@@ -490,58 +495,75 @@ watch(formData, (newData) => {
 watch(() => props.nodeData, (newData) => {
   console.log('[PropertyPanel] watch nodeData 变化:', newData)
   if (newData) {
-    formData.value = { ...newData }
-    // 默认值
-    if (!formData.value.selectorType) {
-      formData.value.selectorType = 'css'
-    }
-    if (!formData.value.urlSource) {
-      formData.value.urlSource = 'direct'
-    }
-    if (!formData.value.scrollType) {
-      formData.value.scrollType = 'bottom'
-    }
-    if (!formData.value.openMode) {
-      formData.value.openMode = 'current'
-    }
-    if (!formData.value.extractKeys) {
-      formData.value.extractKeys = '*'
-    }
-    if (!formData.value.interval) {
-      formData.value.interval = 100
-    }
-    if (!formData.value.action) {
-      formData.value.action = 'block'
-    }
-    if (!formData.value.statusCode) {
-      formData.value.statusCode = 403
-    }
-    if (!formData.value.overwriteMode) {
-      formData.value.overwriteMode = 'skip'
-    }
-    if (!formData.value.algorithm) {
-      formData.value.algorithm = 'sm4-ecb'
-    }
-    if (!formData.value.dataFormat) {
-      formData.value.dataFormat = 'text'
-    }
-    if (!formData.value.format) {
-      formData.value.format = 'jsonl'
-    }
-    if (props.nodeType === 'if') {
-      if (!formData.value.operator) {
-        formData.value.operator = '=='
+    // 设置标志，防止触发formData的watch
+    isUpdatingFromProps = true
+    
+    // 检查数据是否真的变化
+    const currentDataStr = JSON.stringify(formData.value)
+    const newDataStr = JSON.stringify(newData)
+    
+    if (currentDataStr !== newDataStr) {
+      formData.value = { ...newData }
+      // 默认值
+      if (!formData.value.selectorType) {
+        formData.value.selectorType = 'css'
       }
-      if (!formData.value.truePort) {
-        formData.value.truePort = 'right'
+      if (!formData.value.urlSource) {
+        formData.value.urlSource = 'direct'
       }
-      if (!formData.value.falsePort) {
-        formData.value.falsePort = 'left'
+      if (!formData.value.scrollType) {
+        formData.value.scrollType = 'bottom'
+      }
+      if (!formData.value.openMode) {
+        formData.value.openMode = 'current'
+      }
+      if (!formData.value.extractKeys) {
+        formData.value.extractKeys = '*'
+      }
+      if (!formData.value.interval) {
+        formData.value.interval = 100
+      }
+      if (!formData.value.action) {
+        formData.value.action = 'block'
+      }
+      if (!formData.value.statusCode) {
+        formData.value.statusCode = 403
+      }
+      if (!formData.value.overwriteMode) {
+        formData.value.overwriteMode = 'skip'
+      }
+      if (!formData.value.algorithm) {
+        formData.value.algorithm = 'sm4-ecb'
+      }
+      if (!formData.value.dataFormat) {
+        formData.value.dataFormat = 'text'
+      }
+      if (!formData.value.format) {
+        formData.value.format = 'jsonl'
+      }
+      if (props.nodeType === 'if') {
+        if (!formData.value.operator) {
+          formData.value.operator = '=='
+        }
+        if (!formData.value.truePort) {
+          formData.value.truePort = 'right'
+        }
+        if (!formData.value.falsePort) {
+          formData.value.falsePort = 'left'
+        }
       }
     }
-
+    
+    // 清除标志
+    setTimeout(() => {
+      isUpdatingFromProps = false
+    }, 50)
   } else {
+    isUpdatingFromProps = true
     formData.value = { selectorType: 'css', urlSource: 'direct', extractKeys: '*', interval: 100, openMode: 'current', overwriteMode: 'skip', algorithm: 'sm4-ecb', dataFormat: 'text' }
+    setTimeout(() => {
+      isUpdatingFromProps = false
+    }, 50)
   }
   console.log('[PropertyPanel] formData 已更新:', formData.value)
 }, { immediate: true })

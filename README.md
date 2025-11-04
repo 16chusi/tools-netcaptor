@@ -280,9 +280,6 @@ wails build -platform darwin/amd64
 ```bash
 # 启动开发模式（热重载）
 wails dev -tags webkit2_41
-
-# 查看日志
-tail -f app.log
 ```
 
 ### 常见问题

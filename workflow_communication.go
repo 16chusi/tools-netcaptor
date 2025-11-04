@@ -48,9 +48,11 @@ func (we *WorkflowExecutor) sendAndWait(msg WSMessage, timeout time.Duration, ex
 
 // HandleResponse 处理来自插件的响应
 func (we *WorkflowExecutor) HandleResponse(msg WSMessage) {
+	log.Printf("[响应处理器] 收到响应消息: Type=%s, Data=%+v", msg.Type, msg.Data)
 	select {
 	case we.responseCh <- msg:
+		log.Printf("[响应处理器] 消息已发送到响应通道")
 	default:
-		log.Printf("[Workflow] 响应通道已满，丢弃消息")
+		log.Printf("[响应处理器] 响应通道已满，丢弃消息")
 	}
 }

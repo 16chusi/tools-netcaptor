@@ -194,7 +194,18 @@ async function onTaskChange(task: any) {
   console.log('[WorkflowDrawer] 更新任务:', task)
   const index = tasks.value.findIndex(t => t.id === task.id)
   if (index >= 0) {
-    tasks.value[index] = { ...task }
+    // 检查是否真的有变化，避免不必要的响应式更新
+    const currentTask = tasks.value[index]
+    const hasChanges = JSON.stringify(currentTask.nodes) !== JSON.stringify(task.nodes) ||
+                      JSON.stringify(currentTask.edges) !== JSON.stringify(task.edges)
+    
+    if (!hasChanges) {
+      console.log('[WorkflowDrawer] 数据未变化，跳过更新')
+      return
+    }
+    
+    // 使用 Object.assign 而不是展开运算符，减少响应式触发
+    Object.assign(tasks.value[index], task)
     console.log('[WorkflowDrawer] ✓ 任务已更新到列表')
     
     // 防抖自动保存

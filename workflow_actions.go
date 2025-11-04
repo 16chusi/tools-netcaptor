@@ -72,8 +72,10 @@ func (we *WorkflowExecutor) executeNavigate(step ExecutionStep) (ExecutionResult
 
 // executeClick 执行点击
 func (we *WorkflowExecutor) executeClick(step ExecutionStep) (ExecutionResult, error) {
+	log.Printf("[点击元素节点] 开始执行")
 	selector, ok := step.Params["selector"].(string)
 	if !ok || selector == "" {
+		log.Printf("[点击元素节点] 错误: 缺少 selector 参数")
 		return ExecutionResult{Success: false}, fmt.Errorf("缺少 selector 参数")
 	}
 
@@ -81,6 +83,8 @@ func (we *WorkflowExecutor) executeClick(step ExecutionStep) (ExecutionResult, e
 	if st, ok := step.Params["selectorType"].(string); ok && st != "" {
 		selectorType = st
 	}
+
+	log.Printf("[点击元素节点] 执行参数: selector=%s, selectorType=%s", selector, selectorType)
 
 	msg := WSMessage{
 		Type: "click_element",
@@ -90,18 +94,40 @@ func (we *WorkflowExecutor) executeClick(step ExecutionStep) (ExecutionResult, e
 		},
 	}
 
-	return we.sendAndWait(msg, 10*time.Second, "click_element")
+	result, err := we.sendAndWait(msg, 10*time.Second, "click_element")
+	if err != nil {
+		log.Printf("[点击元素节点] 执行失败: %v", err)
+	} else {
+		log.Printf("[点击元素节点] 执行成功")
+	}
+	return result, err
 }
 
 // executeInput 执行输入
 func (we *WorkflowExecutor) executeInput(step ExecutionStep) (ExecutionResult, error) {
+	log.Printf("[输入文本节点] 开始执行")
+	log.Printf("[输入文本节点] 参数: %+v", step.Params)
+	
+	// 检查WebSocket连接状态
+	if !we.wsServer.IsRunning() {
+		log.Printf("[输入文本节点] WebSocket服务器未运行")
+		return ExecutionResult{Success: false}, fmt.Errorf("WebSocket服务器未运行")
+	}
+	if !we.wsServer.HasClients() {
+		log.Printf("[输入文本节点] 没有浏览器扩展连接")
+		return ExecutionResult{Success: false}, fmt.Errorf("没有浏览器扩展连接")
+	}
+	log.Printf("[输入文本节点] WebSocket连接正常")
+	
 	selector, ok := step.Params["selector"].(string)
 	if !ok || selector == "" {
+		log.Printf("[输入文本节点] 错误: 缺少 selector 参数")
 		return ExecutionResult{Success: false}, fmt.Errorf("缺少 selector 参数")
 	}
 
 	text, ok := step.Params["text"].(string)
 	if !ok {
+		log.Printf("[输入文本节点] 错误: 缺少 text 参数")
 		return ExecutionResult{Success: false}, fmt.Errorf("缺少 text 参数")
 	}
 
@@ -109,6 +135,8 @@ func (we *WorkflowExecutor) executeInput(step ExecutionStep) (ExecutionResult, e
 	if st, ok := step.Params["selectorType"].(string); ok && st != "" {
 		selectorType = st
 	}
+
+	log.Printf("[输入文本节点] 执行参数: selector=%s, text=%s, selectorType=%s", selector, text, selectorType)
 
 	msg := WSMessage{
 		Type: "input_text",
@@ -119,7 +147,15 @@ func (we *WorkflowExecutor) executeInput(step ExecutionStep) (ExecutionResult, e
 		},
 	}
 
-	return we.sendAndWait(msg, 10*time.Second, "input_text")
+	log.Printf("[输入文本节点] 发送WebSocket消息")
+	result, err := we.sendAndWait(msg, 10*time.Second, "input_text")
+	if err != nil {
+		log.Printf("[输入文本节点] 执行失败: %v", err)
+	} else {
+		log.Printf("[输入文本节点] 执行成功")
+	}
+	
+	return result, err
 }
 
 // executeWait 执行等待
@@ -139,8 +175,10 @@ func (we *WorkflowExecutor) executeWait(step ExecutionStep) (ExecutionResult, er
 
 // executeExtract 执行数据提取
 func (we *WorkflowExecutor) executeExtract(step ExecutionStep) (ExecutionResult, error) {
+	log.Printf("[数据提取节点] 开始执行")
 	selector, _ := step.Params["selector"].(string)
 	if selector == "" {
+		log.Printf("[数据提取节点] 错误: 缺少 selector 参数")
 		return ExecutionResult{Success: false}, fmt.Errorf("缺少 selector 参数")
 	}
 
@@ -148,6 +186,13 @@ func (we *WorkflowExecutor) executeExtract(step ExecutionStep) (ExecutionResult,
 	if st, ok := step.Params["selectorType"].(string); ok && st != "" {
 		selectorType = st
 	}
+
+	attribute := "text"
+	if attr, ok := step.Params["attribute"].(string); ok && attr != "" {
+		attribute = attr
+	}
+
+	log.Printf("[数据提取节点] 执行参数: selector=%s, selectorType=%s, attribute=%s", selector, selectorType, attribute)
 
 	msg := WSMessage{
 		Type: "extract_data",
@@ -164,9 +209,12 @@ func (we *WorkflowExecutor) executeExtract(step ExecutionStep) (ExecutionResult,
 		if saveToVariable, ok := step.Params["saveToVariable"].(string); ok && saveToVariable != "" {
 			if data, ok := result.Data["value"]; ok {
 				we.variables[saveToVariable] = data
-				log.Printf("[Workflow] ✓ 变量已保存: %s = %v", saveToVariable, data)
+				log.Printf("[数据提取节点] ✓ 数据已保存到变量: %s = %v", saveToVariable, data)
 			}
 		}
+		log.Printf("[数据提取节点] 执行成功")
+	} else {
+		log.Printf("[数据提取节点] 执行失败: %v", err)
 	}
 
 	return result, err

@@ -14,11 +14,17 @@ func (we *WorkflowExecutor) executeJSONLReader(step ExecutionStep, task Workflow
 
 // executeJSONLReaderWithDepth 执行JSONL读取器（支持嵌套深度控制）
 func (we *WorkflowExecutor) executeJSONLReaderWithDepth(step ExecutionStep, task WorkflowTask, stepCount int, depth int) error {
+	log.Printf("[JSONL读取器] ========== 开始执行 (深度:%d) ==========", depth)
+	log.Printf("[JSONL读取器] 参数: %+v", step.Params)
+	
 	// 获取文件路径
 	filePath, ok := step.Params["filePath"].(string)
 	if !ok || filePath == "" {
+		log.Printf("[JSONL读取器] 错误: 缺少 filePath 参数")
 		return fmt.Errorf("缺少 filePath 参数")
 	}
+	
+	log.Printf("[JSONL读取器] 文件路径: %s", filePath)
 
 	// 获取提取字段
 	extractKeysStr, _ := step.Params["extractKeys"].(string)
@@ -89,6 +95,12 @@ func (we *WorkflowExecutor) executeJSONLReaderWithDepth(step ExecutionStep, task
 
 		log.Printf("[Workflow] ========== 处理第 %d/%d 行 ==========", i+1, lineCount)
 
+		// 每次循环前等待，确保页面和扩展状态稳定
+		if i > 0 { // 第一次不需要等待
+			log.Printf("[JSONL读取器] 等待页面稳定...")
+			time.Sleep(3 * time.Second)
+		}
+
 		// 获取当前行数据
 		lineData, err := reader.GetLine(i)
 		if err != nil {
@@ -100,10 +112,19 @@ func (we *WorkflowExecutor) executeJSONLReaderWithDepth(step ExecutionStep, task
 
 		// 保存到变量
 		we.variables[saveToVariable] = extractedData
-		log.Printf("[Workflow] ✓ 变量已保存: %s = %v", saveToVariable, extractedData)
+		log.Printf("[JSONL读取器] ✓ 变量已保存: %s = %v", saveToVariable, extractedData)
+		
+		log.Printf("[JSONL读取器] ========== 保存后的所有变量 ==========")
+		for key, value := range we.variables {
+			log.Printf("[JSONL读取器] 变量: %s (%T) = %v", key, value, value)
+		}
+		log.Printf("[JSONL读取器] =====================================")
 
 		// 执行循环体（从下一个节点开始，直到结束节点）
-		if err := we.executeLoopBodyWithDepth(task, nextNodeID, stepCount, depth); err != nil {
+		log.Printf("[JSONL读取器] 准备执行循环体...")
+		
+		// 临时使用原始的executeLoopBody，不使用多层循环
+		if err := we.executeLoopBody(task, nextNodeID, stepCount); err != nil {
 			return fmt.Errorf("执行第 %d 行时失败: %w", i+1, err)
 		}
 
@@ -247,12 +268,32 @@ func (we *WorkflowExecutor) executeLoopBodyWithDepth(task WorkflowTask, startNod
 		}
 		we.replaceVariables(&step)
 
+		log.Printf("[循环体执行器] ========== 当前变量状态 ==========")
+		for key, value := range we.variables {
+			log.Printf("[循环体执行器] 变量: %s (%T) = %v", key, value, value)
+		}
+		log.Printf("[循环体执行器] =====================================")
+
+		// 获取节点的自定义标签或类型作为显示名称
+		nodeDisplayName := node.Type
+		if customLabel, ok := node.Data["customLabel"].(string); ok && customLabel != "" {
+			nodeDisplayName = fmt.Sprintf("%s(%s)", customLabel, node.Type)
+		}
+
+		log.Printf("[循环体执行器] 准备执行节点: [%s] ID=%s, 参数=%+v", nodeDisplayName, currentNodeID, step.Params)
+		
 		result, err := we.executeStep(step)
 		if err != nil {
+			log.Printf("[循环体执行器] ❌ 节点执行失败: [%s] ID=%s, 错误=%v", nodeDisplayName, currentNodeID, err)
 			return fmt.Errorf("步骤执行失败: %w", err)
 		}
 
-		log.Printf("[Workflow] 步骤完成: %v", result.Message)
+		// 安全访问result.Message
+		message := "步骤完成"
+		if result.Message != "" {
+			message = result.Message
+		}
+		log.Printf("[循环体执行器] ✅ 节点执行成功: [%s] %v", nodeDisplayName, message)
 
 		// 查找下一个节点
 		currentNodeID = we.findNextNode(task, currentNodeID, "")

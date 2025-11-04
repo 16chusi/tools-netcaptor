@@ -155,9 +155,13 @@ func (ws *WebSocketServer) handleMessage(conn *websocket.Conn, msg WSMessage) {
 		}
 
 	case "action_result":
+		log.Printf("[WebSocket服务器] 收到action_result消息: %+v", msg.Data)
 		// 转发给工作流执行器
 		if ws.app.workflowExecutor != nil {
+			log.Printf("[WebSocket服务器] 转发消息给工作流执行器")
 			ws.app.workflowExecutor.HandleResponse(msg)
+		} else {
+			log.Printf("[WebSocket服务器] 工作流执行器为空，无法转发消息")
 		}
 
 	default:
