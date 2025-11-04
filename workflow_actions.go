@@ -173,12 +173,12 @@ func (we *WorkflowExecutor) executeWait(step ExecutionStep) (ExecutionResult, er
 	}, nil
 }
 
-// executeExtract 执行数据提取
+// executeExtract 执行网页内容获取
 func (we *WorkflowExecutor) executeExtract(step ExecutionStep) (ExecutionResult, error) {
-	log.Printf("[数据提取节点] 开始执行")
+	log.Printf("[获取网页内容节点] 开始执行")
 	selector, _ := step.Params["selector"].(string)
 	if selector == "" {
-		log.Printf("[数据提取节点] 错误: 缺少 selector 参数")
+		log.Printf("[获取网页内容节点] 错误: 缺少 selector 参数")
 		return ExecutionResult{Success: false}, fmt.Errorf("缺少 selector 参数")
 	}
 
@@ -192,7 +192,7 @@ func (we *WorkflowExecutor) executeExtract(step ExecutionStep) (ExecutionResult,
 		attribute = attr
 	}
 
-	log.Printf("[数据提取节点] 执行参数: selector=%s, selectorType=%s, attribute=%s", selector, selectorType, attribute)
+	log.Printf("[获取网页内容节点] 执行参数: selector=%s, selectorType=%s, attribute=%s", selector, selectorType, attribute)
 
 	msg := WSMessage{
 		Type: "extract_data",
@@ -203,18 +203,40 @@ func (we *WorkflowExecutor) executeExtract(step ExecutionStep) (ExecutionResult,
 		},
 	}
 
+	log.Printf("[获取网页内容节点] 发送WebSocket消息到浏览器扩展: %+v", msg)
+	log.Printf("[获取网页内容节点] 等待浏览器扩展响应...")
+	
 	result, err := we.sendAndWait(msg, 10*time.Second, "extract")
 
 	if err == nil && result.Success {
+		log.Printf("[获取网页内容节点] 收到成功响应: %+v", result.Data)
 		if saveToVariable, ok := step.Params["saveToVariable"].(string); ok && saveToVariable != "" {
 			if data, ok := result.Data["value"]; ok {
+				log.Printf("[获取网页内容节点] 准备保存数据到变量 %s: %v", saveToVariable, data)
+				
+				// 检查是否覆盖了现有变量
+				if oldValue, exists := we.variables[saveToVariable]; exists {
+					log.Printf("[获取网页内容节点] ⚠️ 覆盖现有变量 %s: 旧值=%v, 新值=%v", saveToVariable, oldValue, data)
+				}
+				
 				we.variables[saveToVariable] = data
-				log.Printf("[数据提取节点] ✓ 数据已保存到变量: %s = %v", saveToVariable, data)
+				log.Printf("[获取网页内容节点] ✓ 数据已保存到变量: %s = %v", saveToVariable, data)
+				
+				// 验证保存是否成功
+				if savedValue, exists := we.variables[saveToVariable]; exists {
+					log.Printf("[获取网页内容节点] ✓ 验证保存成功: %s = %v", saveToVariable, savedValue)
+				} else {
+					log.Printf("[获取网页内容节点] ❌ 验证保存失败: 变量 %s 不存在", saveToVariable)
+				}
+			} else {
+				log.Printf("[获取网页内容节点] ❌ 响应中没有 value 字段: %+v", result.Data)
 			}
+		} else {
+			log.Printf("[获取网页内容节点] 没有配置 saveToVariable 参数，不保存数据")
 		}
-		log.Printf("[数据提取节点] 执行成功")
+		log.Printf("[获取网页内容节点] 执行成功")
 	} else {
-		log.Printf("[数据提取节点] 执行失败: %v", err)
+		log.Printf("[获取网页内容节点] 执行失败: %v", err)
 	}
 
 	return result, err

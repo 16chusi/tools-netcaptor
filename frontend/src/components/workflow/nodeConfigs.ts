@@ -31,7 +31,7 @@ export const NODE_GROUPS: NodeGroup[] = [
     name: 'data',
     title: '数据处理',
     nodes: [
-      { type: 'extract', label: '提取数据', icon: '📋', color: 'rgba(94, 92, 230, 0.15)', description: '提取数据' },
+      { type: 'extract', label: '获取网页内容', icon: '📋', color: 'rgba(94, 92, 230, 0.15)', description: '从网页DOM中获取内容' },
       { type: 'download', label: '下载保存', icon: '💾', color: 'rgba(16, 137, 62, 0.15)', description: '下载文件' },
       { type: 'download_captured', label: '下载已捕获', icon: '📥', color: 'rgba(0, 153, 115, 0.15)', description: '下载已捕获的响应' },
       { type: 'collect', label: '数据收集器', icon: '📝', color: 'rgba(103, 58, 183, 0.15)', description: '追加数据到文件' },
