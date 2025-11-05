@@ -149,9 +149,10 @@ function onDragStart(event: DragEvent, config: NodeConfig) {
   border-radius: 6px;
   background: white;
   user-select: none;
-  overflow-y: auto;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 1001;
+  display: flex;
+  flex-direction: column;
 }
 
 .stencil-header {
@@ -165,6 +166,13 @@ function onDragStart(event: DragEvent, config: NodeConfig) {
   align-items: center;
   border-radius: 6px 6px 0 0;
   cursor: move;
+  flex-shrink: 0;
+}
+
+.stencil-groups {
+  padding: 8px 0;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .close-btn {
@@ -185,10 +193,6 @@ function onDragStart(event: DragEvent, config: NodeConfig) {
 .close-btn:hover {
   background: #e8eaed;
   color: #333;
-}
-
-.stencil-groups {
-  padding: 8px 0;
 }
 
 .group {
