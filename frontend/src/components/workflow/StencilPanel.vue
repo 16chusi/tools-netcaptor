@@ -16,9 +16,11 @@
             v-for="node in group.nodes"
             :key="node.type"
             class="node-item"
+            :class="{ 'variable-item': group.name === 'variables' }"
             :style="{ background: node.color }"
-            draggable="true"
-            @dragstart="onDragStart($event, node)"
+            :draggable="group.name !== 'variables'"
+            :title="group.name === 'variables' ? node.description : ''"
+            @dragstart="group.name !== 'variables' ? onDragStart($event, node) : null"
           >
             <span class="node-icon">{{ node.icon }}</span>
             <span class="node-label">{{ node.label }}</span>
@@ -236,8 +238,9 @@ function onDragStart(event: DragEvent, config: NodeConfig) {
   border: 1px solid rgba(0, 0, 0, 0.08);
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 6px;
+  padding: 0 8px;
   cursor: move;
   transition: all 0.2s;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -247,6 +250,18 @@ function onDragStart(event: DragEvent, config: NodeConfig) {
   transform: translateY(-1px);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   border-color: rgba(0, 0, 0, 0.12);
+}
+
+.variable-item {
+  cursor: default !important;
+  border: 1px solid #e8e8e8 !important;
+  background: #f9f9f9 !important;
+}
+
+.variable-item:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  border-color: #e8e8e8 !important;
 }
 
 .node-icon {

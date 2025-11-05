@@ -4,8 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
+	"strconv"
 	"strings"
+	"time"
+
+	"github.com/google/uuid"
 )
+
+// 全局计数器
+var globalCounter int = 0
 
 // replaceVariables 替换步骤参数中的变量
 func (we *WorkflowExecutor) replaceVariables(step *ExecutionStep) {
@@ -34,6 +42,13 @@ func (we *WorkflowExecutor) replaceVariablesInString(str string) string {
 		placeholder := str[start : end+1]
 		varPath := str[start+1 : end]
 
+		// 处理内置变量
+		if builtinValue := we.resolveBuiltinVariable(varPath); builtinValue != "" {
+			str = strings.Replace(str, placeholder, builtinValue, 1)
+			continue
+		}
+
+		// 处理用户定义变量
 		value := we.resolveVariablePath(varPath)
 		if value != nil {
 			str = strings.Replace(str, placeholder, fmt.Sprintf("%v", value), 1)
@@ -46,6 +61,99 @@ func (we *WorkflowExecutor) replaceVariablesInString(str string) string {
 		log.Printf("[Workflow] 变量替换: %s -> %s", original, str)
 	}
 	return str
+}
+
+// resolveBuiltinVariable 解析内置变量
+func (we *WorkflowExecutor) resolveBuiltinVariable(varName string) string {
+	now := time.Now()
+
+	switch varName {
+	case "timestamp":
+		return now.Format("20060102_150405")
+	case "date":
+		return now.Format("20060102")
+	case "time":
+		return now.Format("150405")
+	case "uuid":
+		return uuid.New().String()
+	case "uuid_short":
+		return uuid.New().String()[:8]
+	case "random":
+		return strconv.Itoa(rand.Intn(10000))
+	case "random_6":
+		return fmt.Sprintf("%06d", rand.Intn(1000000))
+	case "counter":
+		globalCounter++
+		return strconv.Itoa(globalCounter)
+	case "title":
+		// 页面标题需要通过WebSocket从浏览器获取
+		return we.getPageTitle()
+	case "url":
+		// 当前页面URL需要通过WebSocket从浏览器获取
+		return we.getCurrentURL()
+	}
+
+	return ""
+}
+
+// getPageTitle 获取页面标题
+func (we *WorkflowExecutor) getPageTitle() string {
+	if !we.wsServer.IsRunning() || !we.wsServer.HasClients() {
+		return "unknown_title"
+	}
+
+	msg := WSMessage{
+		Type: "get_page_info",
+		Data: map[string]interface{}{
+			"info": "title",
+		},
+	}
+
+	result, err := we.sendAndWait(msg, 5*time.Second, "get_page_info")
+	if err != nil || !result.Success {
+		return "unknown_title"
+	}
+
+	if title, ok := result.Data["title"].(string); ok {
+		// 清理标题中的特殊字符
+		title = strings.ReplaceAll(title, "/", "_")
+		title = strings.ReplaceAll(title, "\\", "_")
+		title = strings.ReplaceAll(title, ":", "_")
+		title = strings.ReplaceAll(title, "*", "_")
+		title = strings.ReplaceAll(title, "?", "_")
+		title = strings.ReplaceAll(title, "\"", "_")
+		title = strings.ReplaceAll(title, "<", "_")
+		title = strings.ReplaceAll(title, ">", "_")
+		title = strings.ReplaceAll(title, "|", "_")
+		return title
+	}
+
+	return "unknown_title"
+}
+
+// getCurrentURL 获取当前页面URL
+func (we *WorkflowExecutor) getCurrentURL() string {
+	if !we.wsServer.IsRunning() || !we.wsServer.HasClients() {
+		return "unknown_url"
+	}
+
+	msg := WSMessage{
+		Type: "get_page_info",
+		Data: map[string]interface{}{
+			"info": "url",
+		},
+	}
+
+	result, err := we.sendAndWait(msg, 5*time.Second, "get_page_info")
+	if err != nil || !result.Success {
+		return "unknown_url"
+	}
+
+	if url, ok := result.Data["url"].(string); ok {
+		return url
+	}
+
+	return "unknown_url"
 }
 
 // resolveVariablePath 解析变量路径 支持 data.url 和 data[url]

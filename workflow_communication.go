@@ -22,7 +22,9 @@ func (we *WorkflowExecutor) sendAndWait(msg WSMessage, timeout time.Duration, ex
 	for {
 		select {
 		case response := <-we.responseCh:
-			log.Printf("[Workflow] 收到响应: %+v", response.Data)
+			log.Printf("[Workflow] 收到响应: Type=%s, Data=%+v", response.Type, response.Data)
+
+			// 处理action_result类型响应
 			if response.Type == "action_result" {
 				if action, ok := response.Data["action"].(string); ok && action != expectedAction {
 					log.Printf("[Workflow] 忽略不匹配响应: 期望 %s, 实际 %s", expectedAction, action)
@@ -40,6 +42,19 @@ func (we *WorkflowExecutor) sendAndWait(msg WSMessage, timeout time.Duration, ex
 				}
 				return ExecutionResult{Success: false, Error: errMsg}, fmt.Errorf("%s", errMsg)
 			}
+
+			// 处理直接类型响应 (如screenshot, get_page_info)
+			if response.Type == expectedAction {
+				if success, ok := response.Data["success"].(bool); ok && success {
+					return ExecutionResult{Success: true, Message: "执行成功", Data: response.Data}, nil
+				}
+				errMsg := "执行失败"
+				if err, ok := response.Data["error"].(string); ok {
+					errMsg = err
+				}
+				return ExecutionResult{Success: false, Error: errMsg}, fmt.Errorf("%s", errMsg)
+			}
+
 		case <-time.After(time.Until(deadline)):
 			return ExecutionResult{Success: false}, fmt.Errorf("执行超时")
 		}

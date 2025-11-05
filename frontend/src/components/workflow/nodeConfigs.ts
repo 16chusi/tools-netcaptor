@@ -30,10 +30,9 @@ export const NODE_GROUPS: NodeGroup[] = [
     nodes: [
       { type: 'extract', label: '提取数据', icon: '📊', color: 'rgba(250, 140, 22, 0.15)', description: '从网页DOM中获取内容' },
       { type: 'download', label: '文件下载', icon: '💾', color: 'rgba(250, 140, 22, 0.15)', description: '下载文件' },
-      { type: 'download_captured', label: '下载已捕获响应', icon: '💾', color: 'rgba(250, 140, 22, 0.15)', description: '下载已捕获的响应' },
+      { type: 'screenshot', label: '网页截图', icon: '📸', color: 'rgba(250, 140, 22, 0.15)', description: '截图保存为图片或PDF' },
       { type: 'collect', label: '数据收集器', icon: '📊', color: 'rgba(250, 140, 22, 0.15)', description: '追加数据到文件' },
       { type: 'decrypt', label: '数据解密', icon: '🔐', color: 'rgba(250, 140, 22, 0.15)', description: '解密数据' },
-      { type: 'intercept_request', label: '请求拦截', icon: '🔍', color: 'rgba(250, 140, 22, 0.15)', description: '拦截和修改HTTP请求' },
       { type: 'jsonl_reader', label: 'JSONL读取器', icon: '📄', color: 'rgba(250, 140, 22, 0.15)', description: '读取JSONL文件并循环' }
     ]
   },
@@ -60,6 +59,25 @@ export const NODE_GROUPS: NodeGroup[] = [
       { type: 'ai_transform_data', label: 'AI数据转换', icon: '🤖', color: 'rgba(82, 196, 26, 0.15)', description: '转换数据格式和结构' },
       { type: 'ai_form_fill', label: 'AI表单填写', icon: '🤖', color: 'rgba(82, 196, 26, 0.15)', description: '智能理解并填写表单' },
       { type: 'ai_navigation', label: 'AI智能导航', icon: '🤖', color: 'rgba(82, 196, 26, 0.15)', description: '根据描述智能导航' }
+    ]
+  },
+  {
+    name: 'variables',
+    title: '内置变量',
+    icon: '🔧',
+    color: '#666666',
+    nodes: [
+      { type: 'var_timestamp', label: '{timestamp}', icon: '⏰', color: 'transparent', description: '完整时间戳: 20241105_190116' },
+      { type: 'var_date', label: '{date}', icon: '📅', color: 'transparent', description: '日期: 20241105' },
+      { type: 'var_time', label: '{time}', icon: '🕐', color: 'transparent', description: '时间: 190116' },
+      { type: 'var_uuid', label: '{uuid}', icon: '🆔', color: 'transparent', description: '完整UUID: 550e8400-e29b-41d4...' },
+      { type: 'var_uuid_short', label: '{uuid_short}', icon: '🔖', color: 'transparent', description: '短UUID: 550e8400' },
+      { type: 'var_counter', label: '{counter}', icon: '🔢', color: 'transparent', description: '自增计数器: 1, 2, 3...' },
+      { type: 'var_random', label: '{random}', icon: '🎲', color: 'transparent', description: '4位随机数: 0-9999' },
+      { type: 'var_random_6', label: '{random_6}', icon: '🎯', color: 'transparent', description: '6位随机数: 000000-999999' },
+      { type: 'var_title', label: '{title}', icon: '📄', color: 'transparent', description: '页面标题 (自动清理特殊字符)' },
+      { type: 'var_url', label: '{url}', icon: '🌐', color: 'transparent', description: '当前页面URL' },
+      { type: 'var_index', label: '{index}', icon: '🔄', color: 'transparent', description: '循环索引 (在for循环中)' }
     ]
   }
 ]

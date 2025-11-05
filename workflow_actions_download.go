@@ -1,8 +1,6 @@
 package main
 
 import (
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -10,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -115,98 +112,4 @@ func (we *WorkflowExecutor) executeDownload(step ExecutionStep) (ExecutionResult
 		Success: true,
 		Message: fmt.Sprintf("下载完成: %d 个文件", len(downloadedFiles)),
 	}, nil
-}
-
-// executeInterceptRequest 执行请求拦截
-func (we *WorkflowExecutor) executeInterceptRequest(step ExecutionStep) (ExecutionResult, error) {
-	log.Printf("[Workflow] WebSocket 运行状态: %v, 客户端连接: %v", we.wsServer.IsRunning(), we.wsServer.HasClients())
-
-	urlPattern, _ := step.Params["urlPattern"].(string)
-	if urlPattern == "" {
-		return ExecutionResult{Success: false}, fmt.Errorf("缺少 URL 匹配模式")
-	}
-
-	action, _ := step.Params["action"].(string)
-	if action == "" {
-		action = "block"
-	}
-
-	mockResponse, _ := step.Params["mockResponse"].(string)
-	redirectUrl, _ := step.Params["redirectUrl"].(string)
-	saveDirectory, _ := step.Params["saveDirectory"].(string)
-	fileExtension, _ := step.Params["fileExtension"].(string)
-	dataFormat, _ := step.Params["dataFormat"].(string)
-	saveToVariable, _ := step.Params["saveToVariable"].(string)
-	statusCode := 403
-	if sc, ok := step.Params["statusCode"].(float64); ok {
-		statusCode = int(sc)
-	}
-
-	log.Printf("[Workflow] 设置请求拦截: urlPattern=%s, action=%s, dataFormat=%s, saveToVariable=%s", urlPattern, action, dataFormat, saveToVariable)
-
-	msg := WSMessage{
-		Type: "setup_intercept",
-		Data: map[string]interface{}{
-			"urlPattern":     urlPattern,
-			"action":         action,
-			"mockResponse":   mockResponse,
-			"redirectUrl":    redirectUrl,
-			"saveDirectory":  saveDirectory,
-			"fileExtension":  fileExtension,
-			"statusCode":     statusCode,
-			"dataFormat":     dataFormat,
-			"saveToVariable": saveToVariable,
-		},
-	}
-	log.Printf("[Workflow] 发送 WebSocket 消息: %+v", msg.Data)
-
-	result, err := we.sendAndWait(msg, 10*time.Second, "setup_intercept")
-	if err != nil {
-		return result, err
-	}
-
-	// 如果是捕获数据模式，等待数据被捕获
-	if action == "capture" && saveToVariable != "" && result.Success {
-		log.Printf("[Workflow] 拦截规则已设置，等待请求被捕获...")
-		// 注意：这里只是设置了拦截规则，实际数据需要在后续步骤中通过浏览器扩展的事件获取
-		// 建议在拦截请求节点后添加：点击按钮 → 等待节点(1-2秒) → 使用捕获的数据
-	}
-
-	return result, nil
-}
-
-// convertDataFormat 转换数据格式
-func convertDataFormat(data interface{}, format string) (string, error) {
-	var dataStr string
-	switch v := data.(type) {
-	case string:
-		dataStr = v
-	case []byte:
-		dataStr = string(v)
-	default:
-		jsonBytes, err := json.Marshal(data)
-		if err != nil {
-			return "", fmt.Errorf("数据序列化失败: %w", err)
-		}
-		dataStr = string(jsonBytes)
-	}
-
-	switch format {
-	case "hex":
-		return hex.EncodeToString([]byte(dataStr)), nil
-	case "json":
-		var jsonData interface{}
-		if err := json.Unmarshal([]byte(dataStr), &jsonData); err != nil {
-			return "", fmt.Errorf("JSON解析失败: %w", err)
-		}
-		formatted, err := json.Marshal(jsonData)
-		if err != nil {
-			return "", fmt.Errorf("JSON格式化失败: %w", err)
-		}
-		return string(formatted), nil
-	case "text":
-		fallthrough
-	default:
-		return dataStr, nil
-	}
 }

@@ -23,12 +23,10 @@ func (we *WorkflowExecutor) executeStep(step ExecutionStep) (ExecutionResult, er
 		return we.executeExtract(step)
 	case "download":
 		return we.executeDownload(step)
+	case "screenshot":
+		return we.executeScreenshot(step)
 	case "scroll":
 		return we.executeScroll(step)
-	case "intercept_request":
-		return we.executeInterceptRequest(step)
-	case "download_captured":
-		return we.executeDownloadCaptured(step)
 	case "collect":
 		return we.executeCollect(step)
 	case "decrypt":
@@ -121,7 +119,7 @@ func (we *WorkflowExecutor) executeClick(step ExecutionStep) (ExecutionResult, e
 func (we *WorkflowExecutor) executeInput(step ExecutionStep) (ExecutionResult, error) {
 	log.Printf("[输入文本节点] 开始执行")
 	log.Printf("[输入文本节点] 参数: %+v", step.Params)
-	
+
 	// 检查WebSocket连接状态
 	if !we.wsServer.IsRunning() {
 		log.Printf("[输入文本节点] WebSocket服务器未运行")
@@ -132,7 +130,7 @@ func (we *WorkflowExecutor) executeInput(step ExecutionStep) (ExecutionResult, e
 		return ExecutionResult{Success: false}, fmt.Errorf("没有浏览器扩展连接")
 	}
 	log.Printf("[输入文本节点] WebSocket连接正常")
-	
+
 	selector, ok := step.Params["selector"].(string)
 	if !ok || selector == "" {
 		log.Printf("[输入文本节点] 错误: 缺少 selector 参数")
@@ -168,7 +166,7 @@ func (we *WorkflowExecutor) executeInput(step ExecutionStep) (ExecutionResult, e
 	} else {
 		log.Printf("[输入文本节点] 执行成功")
 	}
-	
+
 	return result, err
 }
 
@@ -219,7 +217,7 @@ func (we *WorkflowExecutor) executeExtract(step ExecutionStep) (ExecutionResult,
 
 	log.Printf("[获取网页内容节点] 发送WebSocket消息到浏览器扩展: %+v", msg)
 	log.Printf("[获取网页内容节点] 等待浏览器扩展响应...")
-	
+
 	result, err := we.sendAndWait(msg, 10*time.Second, "extract")
 
 	if err == nil && result.Success {
@@ -227,15 +225,15 @@ func (we *WorkflowExecutor) executeExtract(step ExecutionStep) (ExecutionResult,
 		if saveToVariable, ok := step.Params["saveToVariable"].(string); ok && saveToVariable != "" {
 			if data, ok := result.Data["value"]; ok {
 				log.Printf("[获取网页内容节点] 准备保存数据到变量 %s: %v", saveToVariable, data)
-				
+
 				// 检查是否覆盖了现有变量
 				if oldValue, exists := we.variables[saveToVariable]; exists {
 					log.Printf("[获取网页内容节点] ⚠️ 覆盖现有变量 %s: 旧值=%v, 新值=%v", saveToVariable, oldValue, data)
 				}
-				
+
 				we.variables[saveToVariable] = data
 				log.Printf("[获取网页内容节点] ✓ 数据已保存到变量: %s = %v", saveToVariable, data)
-				
+
 				// 验证保存是否成功
 				if savedValue, exists := we.variables[saveToVariable]; exists {
 					log.Printf("[获取网页内容节点] ✓ 验证保存成功: %s = %v", saveToVariable, savedValue)

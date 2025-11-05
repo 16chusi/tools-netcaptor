@@ -164,6 +164,20 @@ func (ws *WebSocketServer) handleMessage(conn *websocket.Conn, msg WSMessage) {
 			log.Printf("[WebSocket服务器] 工作流执行器为空，无法转发消息")
 		}
 
+	case "screenshot":
+		log.Printf("[WebSocket服务器] 收到screenshot消息")
+		// 转发给工作流执行器
+		if ws.app.workflowExecutor != nil {
+			ws.app.workflowExecutor.HandleResponse(msg)
+		}
+
+	case "get_page_info":
+		log.Printf("[WebSocket服务器] 收到get_page_info消息")
+		// 转发给工作流执行器
+		if ws.app.workflowExecutor != nil {
+			ws.app.workflowExecutor.HandleResponse(msg)
+		}
+
 	default:
 		log.Printf("[WebSocket] 未知消息类型: %s", msg.Type)
 	}

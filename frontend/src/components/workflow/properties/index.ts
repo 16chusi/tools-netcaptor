@@ -5,11 +5,10 @@ import WaitProperty from './WaitProperty.vue'
 import ScrollProperty from './ScrollProperty.vue'
 import ExtractProperty from './ExtractProperty.vue'
 import DownloadProperty from './DownloadProperty.vue'
+import ScreenshotProperty from './ScreenshotProperty.vue'
 import IfProperty from './IfProperty.vue'
 import ForProperty from './ForProperty.vue'
-import InterceptProperty from './InterceptProperty.vue'
 import JSONLProperty from './JSONLProperty.vue'
-import DownloadCapturedProperty from './DownloadCapturedProperty.vue'
 import CollectProperty from './CollectProperty.vue'
 import DecryptProperty from './DecryptProperty.vue'
 import AIExtractProperty from './AIExtractProperty.vue'
@@ -29,11 +28,10 @@ export const propertyComponents = {
   scroll: ScrollProperty,
   extract: ExtractProperty,
   download: DownloadProperty,
+  screenshot: ScreenshotProperty,
   if: IfProperty,
   for: ForProperty,
-  intercept_request: InterceptProperty,
   jsonl_reader: JSONLProperty,
-  download_captured: DownloadCapturedProperty,
   collect: CollectProperty,
   decrypt: DecryptProperty,
   ai_extract_data: AIExtractProperty,
@@ -53,11 +51,10 @@ export const defaultValues = {
   scroll: { scrollType: 'bottom', interval: 500 },
   extract: { saveToVariable: 'myData', selectorType: 'css', attribute: 'text' },
   download: { urlSource: 'direct' },
+  screenshot: { format: 'png', captureType: 'viewport', quality: '80', filenameTemplate: 'screenshot_{timestamp}' },
   if: { operator: '==', truePort: 'right', falsePort: 'bottom' },
   for: { variable: 'index', interval: 500 },
-  intercept_request: { saveToVariable: 'responseData', matchType: 'contains', extractKeys: '*', timeout: 30000 },
   jsonl_reader: { saveToVariable: 'data', extractKeys: '*', interval: 100 },
-  download_captured: { overwriteMode: 'skip' },
   collect: { format: 'jsonl' },
   decrypt: { saveToVariable: 'decryptedData', algorithm: 'sm4-ecb' },
   ai_extract_data: { saveToVariable: 'extractedData', outputFormat: 'json', retryCount: 3, retryDelay: 2 },
