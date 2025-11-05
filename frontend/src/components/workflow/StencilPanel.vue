@@ -6,8 +6,9 @@
     </div>
     <div class="stencil-groups">
       <div v-for="group in groups" :key="group.name" class="group">
-        <div class="group-title" @click="toggleGroup(group.name)">
+        <div class="group-title" @click="toggleGroup(group.name)" :style="{ color: group.color }">
           <span class="group-icon">{{ expandedGroups[group.name] ? '▼' : '▶' }}</span>
+          <span class="group-emoji">{{ group.icon }}</span>
           <span>{{ group.title }}</span>
         </div>
         <div v-show="expandedGroups[group.name]" class="group-content">
@@ -213,6 +214,10 @@ function onDragStart(event: DragEvent, config: NodeConfig) {
 .group-icon {
   font-size: 10px;
   color: #666;
+}
+
+.group-emoji {
+  font-size: 14px;
 }
 
 .group-content {

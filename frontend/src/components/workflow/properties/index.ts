@@ -1,0 +1,70 @@
+import ClickProperty from './ClickProperty.vue'
+import InputProperty from './InputProperty.vue'
+import NavigateProperty from './NavigateProperty.vue'
+import WaitProperty from './WaitProperty.vue'
+import ScrollProperty from './ScrollProperty.vue'
+import ExtractProperty from './ExtractProperty.vue'
+import DownloadProperty from './DownloadProperty.vue'
+import IfProperty from './IfProperty.vue'
+import ForProperty from './ForProperty.vue'
+import InterceptProperty from './InterceptProperty.vue'
+import JSONLProperty from './JSONLProperty.vue'
+import DownloadCapturedProperty from './DownloadCapturedProperty.vue'
+import CollectProperty from './CollectProperty.vue'
+import DecryptProperty from './DecryptProperty.vue'
+import AIExtractProperty from './AIExtractProperty.vue'
+import AIClickProperty from './AIClickProperty.vue'
+import AIAnalyzeProperty from './AIAnalyzeProperty.vue'
+import AIValidateProperty from './AIValidateProperty.vue'
+import AITransformProperty from './AITransformProperty.vue'
+import AIFormFillProperty from './AIFormFillProperty.vue'
+import AINavigationProperty from './AINavigationProperty.vue'
+
+// 组件映射表
+export const propertyComponents = {
+  click: ClickProperty,
+  input: InputProperty,
+  navigate: NavigateProperty,
+  wait: WaitProperty,
+  scroll: ScrollProperty,
+  extract: ExtractProperty,
+  download: DownloadProperty,
+  if: IfProperty,
+  for: ForProperty,
+  intercept_request: InterceptProperty,
+  jsonl_reader: JSONLProperty,
+  download_captured: DownloadCapturedProperty,
+  collect: CollectProperty,
+  decrypt: DecryptProperty,
+  ai_extract_data: AIExtractProperty,
+  ai_smart_click: AIClickProperty,
+  ai_analyze_content: AIAnalyzeProperty,
+  ai_validate_data: AIValidateProperty,
+  ai_transform_data: AITransformProperty,
+  ai_form_fill: AIFormFillProperty,
+  ai_navigation: AINavigationProperty,
+}
+
+// 默认值配置
+export const defaultValues = {
+  click: { selectorType: 'css', waitTime: 3000 },
+  input: { selectorType: 'css' },
+  navigate: { openMode: 'current' },
+  scroll: { scrollType: 'bottom', interval: 500 },
+  extract: { saveToVariable: 'myData', selectorType: 'css', attribute: 'text' },
+  download: { urlSource: 'direct' },
+  if: { operator: '==', truePort: 'right', falsePort: 'bottom' },
+  for: { variable: 'index', interval: 500 },
+  intercept_request: { saveToVariable: 'responseData', matchType: 'contains', extractKeys: '*', timeout: 30000 },
+  jsonl_reader: { saveToVariable: 'data', extractKeys: '*', interval: 100 },
+  download_captured: { overwriteMode: 'skip' },
+  collect: { format: 'jsonl' },
+  decrypt: { saveToVariable: 'decryptedData', algorithm: 'sm4-ecb' },
+  ai_extract_data: { saveToVariable: 'extractedData', outputFormat: 'json', retryCount: 3, retryDelay: 2 },
+  ai_smart_click: { waitTime: 3000, retryCount: 3, retryDelay: 2 },
+  ai_analyze_content: { saveToVariable: 'analysisResult', retryCount: 3, retryDelay: 2 },
+  ai_validate_data: { saveToVariable: 'validationResult', dataSource: 'current', retryCount: 3, retryDelay: 2 },
+  ai_transform_data: { saveToVariable: 'transformedData', outputFormat: 'json', dataSource: 'current', retryCount: 3, retryDelay: 2 },
+  ai_form_fill: { dataSource: 'current', retryCount: 3, retryDelay: 2 },
+  ai_navigation: { waitTime: 3000, retryCount: 3, retryDelay: 2 },
+}

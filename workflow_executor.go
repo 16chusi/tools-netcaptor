@@ -12,6 +12,7 @@ import (
 type WorkflowExecutor struct {
 	app        *NetworkApp
 	wsServer   *WebSocketServer
+	aiService  *AIService
 	running    bool
 	stopped    bool
 	mu         sync.Mutex
@@ -24,6 +25,7 @@ func NewWorkflowExecutor(app *NetworkApp) *WorkflowExecutor {
 	return &WorkflowExecutor{
 		app:        app,
 		wsServer:   app.wsServer,
+		aiService:  NewAIService(),
 		responseCh: make(chan WSMessage, 10),
 		variables:  make(map[string]interface{}),
 	}

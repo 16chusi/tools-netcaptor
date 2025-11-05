@@ -107,3 +107,17 @@ func (we *WorkflowExecutor) resolveVariablePath(path string) interface{} {
 	}
 	return nil
 }
+
+// setVariable 设置变量
+func (we *WorkflowExecutor) setVariable(name string, value interface{}) {
+	we.variables[name] = value
+	log.Printf("[Workflow] 设置变量 %s = %v", name, value)
+}
+
+// getVariable 获取变量
+func (we *WorkflowExecutor) getVariable(name string) interface{} {
+	if value, exists := we.variables[name]; exists {
+		return value
+	}
+	return nil
+}

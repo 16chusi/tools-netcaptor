@@ -1,0 +1,124 @@
+/* 通用表单样式 */
+.form-item {
+  margin-bottom: 16px;
+}
+
+.form-item label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+  color: #333;
+  text-align: left; /* 确保左对齐 */
+}
+
+.form-item input,
+.form-item select,
+.form-item textarea {
+  width: 100%;
+  max-width: 100%; /* 防止超出容器 */
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box; /* 包含padding和border */
+}
+
+.form-item input:focus,
+.form-item select:focus,
+.form-item textarea:focus {
+  outline: none;
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.variable-hint {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #999;
+  text-align: left;
+  word-wrap: break-word; /* 长文本换行 */
+}
+
+.form-row {
+  display: flex;
+  gap: 8px;
+}
+
+.form-row .form-item {
+  flex: 1;
+}
+
+.form-row input {
+  flex: 1;
+  min-width: 0; /* 防止flex子项超出容器 */
+}
+
+.form-row button {
+  flex-shrink: 0; /* 按钮不缩小 */
+  padding: 8px 12px;
+  border: 1px solid #d9d9d9;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap; /* 按钮文字不换行 */
+}
+
+/* AI组件特殊样式 */
+.ai-section {
+  border: 1px solid #e6f7ff;
+  border-radius: 6px;
+  padding: 12px;
+  background-color: #f6ffed;
+  margin-bottom: 16px;
+}
+
+.ai-section h5 {
+  margin: 0 0 12px 0;
+  color: #52c41a;
+  font-size: 14px;
+}
+
+/* 基础组件背景样式 */
+.basic-section {
+  border: 1px solid #e6f4ff;
+  border-radius: 6px;
+  padding: 12px;
+  background-color: #f0f8ff;
+  margin-bottom: 16px;
+}
+
+.basic-section h5 {
+  margin: 0 0 12px 0;
+  color: #1890ff;
+  font-size: 14px;
+}
+
+/* 数据处理组件背景样式 */
+.data-section {
+  border: 1px solid #fff2e8;
+  border-radius: 6px;
+  padding: 12px;
+  background-color: #fff7e6;
+  margin-bottom: 16px;
+}
+
+.data-section h5 {
+  margin: 0 0 12px 0;
+  color: #fa8c16;
+  font-size: 14px;
+}
+
+/* 流程控制组件背景样式 */
+.control-section {
+  border: 1px solid #f9f0ff;
+  border-radius: 6px;
+  padding: 12px;
+  background-color: #f9f0ff;
+  margin-bottom: 16px;
+}
+
+.control-section h5 {
+  margin: 0 0 12px 0;
+  color: #722ed1;
+  font-size: 14px;
+}

@@ -380,3 +380,38 @@ func ExportToFile(ctx context.Context, data string) error {
 	// 写入文件
 	return os.WriteFile(savePath, []byte(data), 0644)
 }
+
+// UpdateAIModels 更新AI模型配置
+func (app *NetworkApp) UpdateAIModels(models []AIModel) error {
+	if app.workflowExecutor != nil && app.workflowExecutor.aiService != nil {
+		app.workflowExecutor.aiService.UpdateModels(models)
+	}
+	return nil
+}
+
+// TestAIModel 测试AI模型连接
+func (app *NetworkApp) TestAIModel(model AIModel) error {
+	fmt.Printf("[AI测试] 开始测试模型: %s, 供应商: %s\n", model.Name, model.Provider)
+	
+	// 创建临时AIService进行测试
+	aiService := NewAIService()
+	aiService.UpdateModels([]AIModel{model})
+	
+	err := aiService.TestModel(model)
+	if err != nil {
+		fmt.Printf("[AI测试] 测试失败: %v\n", err)
+	} else {
+		fmt.Printf("[AI测试] 测试成功\n")
+	}
+	
+	return err
+}
+
+// CallAI 调用AI接口
+func (app *NetworkApp) CallAI(modelIndex int, prompt string, systemPrompt string) (string, error) {
+	if app.workflowExecutor == nil || app.workflowExecutor.aiService == nil {
+		return "", fmt.Errorf("AI服务未初始化")
+	}
+	
+	return app.workflowExecutor.aiService.CallAI(modelIndex, prompt, systemPrompt)
+}

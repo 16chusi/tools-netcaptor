@@ -41,6 +41,13 @@ export type NodeType =
   | 'download_captured'
   | 'collect'
   | 'decrypt'
+  | 'ai_extract_data'
+  | 'ai_analyze_content'
+  | 'ai_validate_data'
+  | 'ai_transform_data'
+  | 'ai_smart_click'
+  | 'ai_form_fill'
+  | 'ai_navigation'
 
 export interface NodeConfig {
   type: NodeType

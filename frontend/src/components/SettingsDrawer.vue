@@ -6,77 +6,99 @@
         <button @click="$emit('close')" class="close-icon">✕</button>
       </div>
       <div class="drawer-content">
-        <div class="setting-item">
-          <label>代理端口</label>
-          <input 
-            :value="proxyPort" 
-            @input="$emit('update:proxyPort', Number(($event.target as HTMLInputElement).value))"
-            type="number" 
-            class="setting-input" 
-            :disabled="proxyRunning"
-            min="1024"
-            max="65535"
-          />
-          <small>修改后需要重启代理</small>
+        <div class="tabs">
+          <button 
+            v-for="tab in tabs" 
+            :key="tab.key"
+            @click="activeTab = tab.key"
+            :class="['tab-btn', { active: activeTab === tab.key }]"
+          >
+            {{ tab.label }}
+          </button>
         </div>
         
-        <div class="setting-item">
-          <label>默认浏览器</label>
-          <select :value="selectedBrowser" @change="$emit('update:selectedBrowser', ($event.target as HTMLSelectElement).value)" class="setting-select">
-            <option value="chrome">Chrome</option>
-            <option value="edge">Edge</option>
-            <option value="firefox">Firefox</option>
-          </select>
-        </div>
-        
-        <div class="setting-item">
-          <label>默认打开 URL</label>
-          <input :value="targetUrl" @input="$emit('update:targetUrl', ($event.target as HTMLInputElement).value)" class="setting-input" placeholder="留空使用测试服务器" />
-          <small>留空将打开内置测试服务器（随机端口）</small>
-        </div>
-        
-        <div class="setting-item">
-          <label>下载路径</label>
-          <div class="path-input-group">
-            <input :value="downloadPath" class="setting-input" placeholder="默认下载目录" readonly />
-            <button @click="$emit('selectPath')" class="browse-btn">浏览...</button>
-          </div>
-          <small>留空使用系统默认下载目录</small>
-        </div>
-        
-        <div class="setting-item">
-          <label>历史记录数量</label>
-          <input 
-            v-model.number="maxHistoryEntries" 
-            @change="updateMaxHistory"
-            type="number" 
-            class="setting-input" 
-            min="10"
-            max="1000"
-            step="10"
-          />
-          <small>保存最近的 N 条记录（默认30，范围10-1000）</small>
-        </div>
-        
-        <div class="setting-item">
-          <label>Webhook 服务</label>
-          <div style="display: flex; gap: 8px; align-items: center;">
-            <div class="info-box" style="flex: 1;">
-              <span class="port-value">{{ webhookRunning ? webhookPort : '未启动' }}</span>
+        <div class="tab-content">
+          <!-- 基础设置 -->
+          <div v-if="activeTab === 'basic'" class="tab-panel">
+            <div class="setting-item">
+              <label>代理端口</label>
+              <input 
+                :value="proxyPort" 
+                @input="$emit('update:proxyPort', Number(($event.target as HTMLInputElement).value))"
+                type="number" 
+                class="setting-input" 
+                :disabled="proxyRunning"
+                min="1024"
+                max="65535"
+              />
+              <small>修改后需要重启代理</small>
             </div>
-            <button v-if="webhookRunning" @click="copyWebhookUrl" class="ws-btn ws-btn-copy">复制</button>
-            <button v-if="!webhookRunning" @click="$emit('startWebhook')" class="ws-btn ws-btn-start">启动</button>
-            <button v-else @click="$emit('stopWebhook')" class="ws-btn ws-btn-stop">停止</button>
+            
+            <div class="setting-item">
+              <label>默认浏览器</label>
+              <select :value="selectedBrowser" @change="$emit('update:selectedBrowser', ($event.target as HTMLSelectElement).value)" class="setting-select">
+                <option value="chrome">Chrome</option>
+                <option value="edge">Edge</option>
+                <option value="firefox">Firefox</option>
+              </select>
+            </div>
+            
+            <div class="setting-item">
+              <label>默认打开 URL</label>
+              <input :value="targetUrl" @input="$emit('update:targetUrl', ($event.target as HTMLInputElement).value)" class="setting-input" placeholder="留空使用测试服务器" />
+              <small>留空将打开内置测试服务器（随机端口）</small>
+            </div>
+            
+            <div class="setting-item">
+              <label>下载路径</label>
+              <div class="path-input-group">
+              <input :value="downloadPath" class="setting-input" placeholder="默认下载目录" readonly />
+              <button @click="$emit('selectPath')" class="browse-btn">浏览...</button>
+            </div>
+            <small>留空使用系统默认下载目录</small>
           </div>
-          <small>HTTP接口 + 测试页面（随机端口）</small>
+          
+          <div class="setting-item">
+            <label>历史记录数量</label>
+            <input 
+              v-model.number="maxHistoryEntries" 
+              @change="updateMaxHistory"
+              type="number" 
+              class="setting-input" 
+              min="10"
+              max="1000"
+              step="10"
+            />
+            <small>保存最近的 N 条记录（默认30，范围10-1000）</small>
+          </div>
+          
+          <div class="setting-item">
+            <label>Webhook 服务</label>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <div class="info-box" style="flex: 1;">
+                <span class="port-value">{{ webhookRunning ? webhookPort : '未启动' }}</span>
+              </div>
+              <button v-if="webhookRunning" @click="copyWebhookUrl" class="ws-btn ws-btn-copy">复制</button>
+              <button v-if="!webhookRunning" @click="$emit('startWebhook')" class="ws-btn ws-btn-start">启动</button>
+              <button v-else @click="$emit('stopWebhook')" class="ws-btn ws-btn-stop">停止</button>
+            </div>
+            <small>HTTP接口 + 测试页面（随机端口）</small>
+          </div>
+        </div>
+        
+        <!-- AI模型设置 -->
+        <div v-if="activeTab === 'ai'" class="tab-panel">
+          <AIModelTab />
         </div>
       </div>
     </div>
+  </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import AIModelTab from './tabs/AIModelTab.vue'
 import {GetMaxHistoryEntries, SetMaxHistoryEntries} from "../../wailsjs/go/main/NetworkApp";
 
 const props = defineProps<{
@@ -93,6 +115,12 @@ const props = defineProps<{
 }>()
 
 const maxHistoryEntries = ref(30)
+
+const activeTab = ref('basic')
+const tabs = [
+  { key: 'basic', label: '⚙️ 基础设置' },
+  { key: 'ai', label: '🤖 AI模型' }
+]
 
 // 加载当前设置
 watch(() => props.visible, async (visible) => {
@@ -203,9 +231,47 @@ function copyWebhookUrl() {
 
 .drawer-content {
   flex: 1;
-  overflow-y: auto;
-  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   text-align: left;
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+.tab-btn {
+  padding: 12px 20px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  color: #666;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  background: #e8eaed;
+  color: #333;
+}
+
+.tab-btn.active {
+  color: #1890ff;
+  border-bottom-color: #1890ff;
+  background: white;
+}
+
+.tab-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.tab-panel {
+  padding: 20px;
 }
 
 .setting-item {
