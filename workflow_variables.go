@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -19,6 +18,15 @@ var globalCounter int = 0
 func (we *WorkflowExecutor) replaceVariables(step *ExecutionStep) {
 	for key, value := range step.Params {
 		if strVal, ok := value.(string); ok {
+			// 如果整个字符串就是 {变量名}，直接替换成变量对象
+			if strings.HasPrefix(strVal, "{") && strings.HasSuffix(strVal, "}") && strings.Count(strVal, "{") == 1 {
+				varName := strings.Trim(strVal, "{}")
+				if varValue := we.resolveVariablePath(varName); varValue != nil {
+					step.Params[key] = varValue
+					continue
+				}
+			}
+			// 否则作为字符串模板处理
 			step.Params[key] = we.replaceVariablesInString(strVal)
 		}
 		// 数字类型的变量替换在各个具体函数中处理
@@ -58,7 +66,7 @@ func (we *WorkflowExecutor) replaceVariablesInString(str string) string {
 		}
 	}
 	if str != original {
-		log.Printf("[Workflow] 变量替换: %s -> %s", original, str)
+		LogDebug(fmt.Sprintf("[Workflow] 变量替换: %s -> %s", original, str))
 	}
 	return str
 }
@@ -158,42 +166,42 @@ func (we *WorkflowExecutor) getCurrentURL() string {
 
 // resolveVariablePath 解析变量路径 支持 data.url 和 data[url]
 func (we *WorkflowExecutor) resolveVariablePath(path string) interface{} {
-	log.Printf("[Workflow] resolveVariablePath: %s", path)
+	LogDebug(fmt.Sprintf("[Workflow] resolveVariablePath: %s", path))
 
 	if strings.Contains(path, ".") {
 		parts := strings.SplitN(path, ".", 2)
-		log.Printf("[Workflow] 解析嵌套路径: 变量=%s, 字段=%s", parts[0], parts[1])
+		LogDebug(fmt.Sprintf("[Workflow] 解析嵌套路径: 变量=%s, 字段=%s", parts[0], parts[1]))
 
 		if val, ok := we.variables[parts[0]]; ok {
-			log.Printf("[Workflow] 变量 %s 存在，类型: %T, 值: %v", parts[0], val, val)
+			LogDebug(fmt.Sprintf("[Workflow] 变量存在，类型: %T, 值: %v", parts[0], val, val))
 
 			// 如果是 map，直接访问
 			if mapVal, isMap := val.(map[string]interface{}); isMap {
-				log.Printf("[Workflow] 变量是 map，访问字段: %s", parts[1])
+				AppLog.Info(fmt.Sprintf("[Workflow] 变量是 map，访问字段: %s", parts[1]))
 				if result, exists := mapVal[parts[1]]; exists {
-					log.Printf("[Workflow] ✓ 找到字段 %s: %v", parts[1], result)
+					AppLog.Info(fmt.Sprintf("[Workflow] ✓ 找到字段 %s: %v", parts[1], result))
 					return result
 				}
-				log.Printf("[Workflow] ✗ map 中不存在字段: %s", parts[1])
+				AppLog.Info(fmt.Sprintf("[Workflow] ✗ map 中不存在字段: %s", parts[1]))
 			}
 
 			// 如果是 JSON 字符串，尝试解析
 			if strVal, isStr := val.(string); isStr {
-				log.Printf("[Workflow] 变量是字符串，尝试解析 JSON")
+				AppLog.Info(fmt.Sprintf("[Workflow] 变量是字符串，尝试解析 JSON"))
 				var jsonData map[string]interface{}
 				if err := json.Unmarshal([]byte(strVal), &jsonData); err == nil {
-					log.Printf("[Workflow] JSON 解析成功，访问字段: %s", parts[1])
+					AppLog.Info(fmt.Sprintf("[Workflow] JSON 解析成功，访问字段: %s", parts[1]))
 					if result, exists := jsonData[parts[1]]; exists {
-						log.Printf("[Workflow] ✓ 找到字段 %s: %v", parts[1], result)
+						AppLog.Info(fmt.Sprintf("[Workflow] ✓ 找到字段 %s: %v", parts[1], result))
 						return result
 					}
-					log.Printf("[Workflow] ✗ JSON 中不存在字段: %s", parts[1])
+					AppLog.Info(fmt.Sprintf("[Workflow] ✗ JSON 中不存在字段: %s", parts[1]))
 				} else {
-					log.Printf("[Workflow] JSON 解析失败: %v", err)
+					AppLog.Info(fmt.Sprintf("[Workflow] JSON 解析失败: %v", err))
 				}
 			}
 		} else {
-			log.Printf("[Workflow] ✗ 变量 %s 不存在", parts[0])
+			AppLog.Info(fmt.Sprintf("[Workflow] ✗ 变量 %s 不存在", parts[0]))
 		}
 	} else if strings.Contains(path, "[") && strings.Contains(path, "]") {
 		start := strings.Index(path, "[")
@@ -206,20 +214,33 @@ func (we *WorkflowExecutor) resolveVariablePath(path string) interface{} {
 			}
 		}
 	} else {
-		log.Printf("[Workflow] 直接访问变量: %s", path)
+		AppLog.Info(fmt.Sprintf("[Workflow] 直接访问变量: %s", path))
 		if val, ok := we.variables[path]; ok {
-			log.Printf("[Workflow] ✓ 变量存在，类型: %T", val)
+			AppLog.Info(fmt.Sprintf("[Workflow] ✓ 变量存在，类型: %T", val))
 			return val
 		}
-		log.Printf("[Workflow] ✗ 变量不存在: %s", path)
+		AppLog.Info(fmt.Sprintf("[Workflow] ✗ 变量不存在: %s", path))
 	}
 	return nil
 }
 
 // setVariable 设置变量
 func (we *WorkflowExecutor) setVariable(name string, value interface{}) {
+	// 自动去除花括号
+	name = strings.TrimPrefix(name, "{")
+	name = strings.TrimSuffix(name, "}")
+
 	we.variables[name] = value
-	log.Printf("[Workflow] 设置变量 %s = %v", name, value)
+	LogDebug(fmt.Sprintf("[Workflow] 设置变量 %s = %v", name, value))
+}
+
+// getAllVariableNames 获取所有变量名（用于调试）
+func (we *WorkflowExecutor) getAllVariableNames() []string {
+	var names []string
+	for name := range we.variables {
+		names = append(names, name)
+	}
+	return names
 }
 
 // getVariable 获取变量

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -56,12 +55,12 @@ func (a *App) StartScraping(url, linkSelector, nextPageSelector string, maxPages
 
 	for {
 		pageCount++
-		log.Printf("正在抓取第 %d 页...", pageCount)
+		AppLog.Info(fmt.Sprintf("正在抓取第 %d 页...", pageCount))
 
 		// 提取当前页面的下载链接
 		links, err := a.browser.ExtractDownloadLinks(linkSelector)
 		if err != nil {
-			log.Printf("提取链接失败: %v", err)
+			AppLog.Info(fmt.Sprintf("提取链接失败: %v", err))
 			break
 		}
 
@@ -80,16 +79,16 @@ func (a *App) StartScraping(url, linkSelector, nextPageSelector string, maxPages
 		// 尝试翻到下一页
 		hasNext, err := a.browser.NextPage(nextPageSelector)
 		if err != nil {
-			log.Printf("翻页失败: %v", err)
+			AppLog.Info(fmt.Sprintf("翻页失败: %v", err))
 			break
 		}
 		if !hasNext {
-			log.Println("没有更多页面")
+			AppLog.Info("没有更多页面")
 			break
 		}
 	}
 
-	log.Printf("抓取完成，共找到 %d 个下载链接", len(allLinks))
+	AppLog.Info(fmt.Sprintf("抓取完成，共找到 %d 个下载链接", len(allLinks)))
 	return allLinks, nil
 }
 
@@ -296,12 +295,12 @@ func (a *App) StartScrapingWithChromeDP(url, linkSelector, nextPageSelector stri
 
 	for {
 		pageCount++
-		log.Printf("正在抓取第 %d 页...", pageCount)
+		AppLog.Info(fmt.Sprintf("正在抓取第 %d 页...", pageCount))
 
 		// 提取当前页面的下载链接
 		links, err := a.chromedp.ExtractDownloadLinks(linkSelector)
 		if err != nil {
-			log.Printf("提取链接失败: %v", err)
+			AppLog.Info(fmt.Sprintf("提取链接失败: %v", err))
 			break
 		}
 
@@ -320,16 +319,16 @@ func (a *App) StartScrapingWithChromeDP(url, linkSelector, nextPageSelector stri
 		// 尝试翻到下一页
 		hasNext, err := a.chromedp.NextPage(nextPageSelector)
 		if err != nil {
-			log.Printf("翻页失败: %v", err)
+			AppLog.Info(fmt.Sprintf("翻页失败: %v", err))
 			break
 		}
 		if !hasNext {
-			log.Println("没有更多页面")
+			AppLog.Info("没有更多页面")
 			break
 		}
 	}
 
-	log.Printf("抓取完成，共找到 %d 个下载链接", len(allLinks))
+	AppLog.Info(fmt.Sprintf("抓取完成，共找到 %d 个下载链接", len(allLinks)))
 	return allLinks, nil
 }
 

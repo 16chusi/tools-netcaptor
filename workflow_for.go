@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"time"
 )
@@ -47,7 +46,7 @@ func (we *WorkflowExecutor) executeForWithDepth(step ExecutionStep, task Workflo
 	}
 
 	loopCount := int(count)
-	log.Printf("[Workflow] For循环 (深度:%d): 次数=%d, 变量=%s, 间隔=%dms", depth, loopCount, variable, interval)
+	AppLog.Info(fmt.Sprintf("[Workflow] For循环 (深度:%d): 次数=%d, 变量=%s, 间隔=%dms", depth, loopCount, variable, interval))
 
 	nextNodeID := we.findNextNode(task, step.NodeID, "")
 	if nextNodeID == "" {
@@ -59,10 +58,10 @@ func (we *WorkflowExecutor) executeForWithDepth(step ExecutionStep, task Workflo
 			return fmt.Errorf("执行已停止")
 		}
 
-		log.Printf("[Workflow] ========== 循环第 %d/%d 次 (深度:%d) ==========", i, loopCount, depth)
+		LogDebug(fmt.Sprintf("[For] ========== 循环第 %d/%d 次 (深度:%d) ==========", i, loopCount, depth))
 
 		we.variables[variable] = i
-		log.Printf("[Workflow] ✓ 变量已设置: %s = %d", variable, i)
+		AppLog.Info(fmt.Sprintf("[Workflow] ✓ 变量已设置: %s = %d", variable, i))
 		we.printAllVariables()
 
 		if err := we.executeLoopBodyWithDepth(task, nextNodeID, stepCount, depth); err != nil {
@@ -74,14 +73,14 @@ func (we *WorkflowExecutor) executeForWithDepth(step ExecutionStep, task Workflo
 		}
 	}
 
-	log.Printf("[Workflow] For循环执行完成 (深度:%d)，共循环 %d 次", depth, loopCount)
+	AppLog.Info(fmt.Sprintf("[Workflow] For循环执行完成 (深度:%d)，共循环 %d 次", depth, loopCount))
 	return nil
 }
 
 func (we *WorkflowExecutor) printAllVariables() {
-	log.Printf("[Workflow] ========== 当前所有变量 ==========")
+	LogDebug(fmt.Sprintf("[Workflow] ========== 当前所有变量 =========="))
 	for key, value := range we.variables {
-		log.Printf("[Workflow]   %s (%T) = %v", key, value, value)
+		AppLog.Info(fmt.Sprintf("[Workflow]   %s (%T) = %v", key, value, value))
 	}
-	log.Printf("[Workflow] =====================================")
+	AppLog.Info(fmt.Sprintf("[Workflow] ====================================="))
 }

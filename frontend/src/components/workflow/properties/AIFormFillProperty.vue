@@ -24,16 +24,20 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { GetAIModels } from '../../../../wailsjs/go/main/NetworkApp'
 
 defineProps<{ formData: any }>()
 
 const aiModels = ref<any[]>([])
 
-onMounted(() => {
-  const saved = localStorage.getItem('ai-models')
-  if (saved) {
-    const settings = JSON.parse(saved)
-    aiModels.value = settings.models || []
+onMounted(async () => {
+  try {
+    // 从后端API获取AI模型配置
+    const models = await GetAIModels()
+    aiModels.value = models || []
+  } catch (error) {
+    console.error('获取AI模型配置失败:', error)
+    aiModels.value = []
   }
 })
 </script>

@@ -44,50 +44,43 @@
       <input v-model="formData.saveToVariable" placeholder="extractedData" />
       <div class="variable-hint">结果将保存到: {{ '{' + (formData.saveToVariable || 'extractedData') + '}' }}</div>
     </div>
-    <div class="form-item">
-      <label>超时时间(秒)</label>
-      <input v-model.number="formData.timeout" type="number" min="10" max="300" placeholder="60" />
-      <div class="variable-hint">AI处理超时时间，建议60-120秒</div>
-    </div>
     
     <details class="advanced-options">
       <summary>🔧 高级选项</summary>
       <div class="form-item">
-        <label>
-          <input type="checkbox" v-model="formData.useCustomSettings" />
-          覆盖全局AI设置
-        </label>
+        <label>超时时间(秒)</label>
+        <input v-model.number="formData.timeout" type="number" min="10" max="300" placeholder="100" />
+        <div class="variable-hint">AI处理超时时间，默认100秒</div>
       </div>
-      <template v-if="formData.useCustomSettings">
-        <div class="form-item">
-          <label>思考模式</label>
-          <select v-model="formData.thinkingMode">
-            <option value="enabled">开启</option>
-            <option value="disabled">关闭</option>
-          </select>
-        </div>
-        <div class="form-item">
-          <label>Top-p</label>
-          <input v-model.number="formData.topP" type="number" min="0" max="1" step="0.1" placeholder="0.9" />
-          <div class="variable-hint">控制输出随机性，0.1-1.0</div>
-        </div>
-        <div class="form-item">
-          <label>Temperature</label>
-          <input v-model.number="formData.temperature" type="number" min="0" max="2" step="0.1" placeholder="0.7" />
-          <div class="variable-hint">控制创造性，0.1-2.0</div>
-        </div>
-        <div class="form-item">
-          <label>Max Tokens</label>
-          <input v-model.number="formData.maxTokens" type="number" min="100" max="8000" placeholder="2000" />
-          <div class="variable-hint">最大输出长度</div>
-        </div>
-      </template>
+      <div class="form-item">
+        <label>思考模式</label>
+        <select v-model="formData.thinkingMode">
+          <option value="enabled">开启</option>
+          <option value="disabled">关闭</option>
+        </select>
+      </div>
+      <div class="form-item">
+        <label>Top-p</label>
+        <input v-model.number="formData.topP" type="number" min="0" max="1" step="0.1" placeholder="0.9" />
+        <div class="variable-hint">控制输出随机性，0.1-1.0</div>
+      </div>
+      <div class="form-item">
+        <label>Temperature</label>
+        <input v-model.number="formData.temperature" type="number" min="0" max="2" step="0.1" placeholder="0.7" />
+        <div class="variable-hint">控制创造性，0.1-2.0</div>
+      </div>
+      <div class="form-item">
+        <label>Max Tokens</label>
+        <input v-model.number="formData.maxTokens" type="number" min="100" max="8000" placeholder="2000" />
+        <div class="variable-hint">最大输出长度</div>
+      </div>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { GetAIModels } from '../../../../wailsjs/go/main/NetworkApp'
 
 defineProps<{
   formData: any
@@ -95,11 +88,14 @@ defineProps<{
 
 const aiModels = ref<any[]>([])
 
-onMounted(() => {
-  const saved = localStorage.getItem('ai-model-settings')
-  if (saved) {
-    const settings = JSON.parse(saved)
-    aiModels.value = settings.models || []
+onMounted(async () => {
+  try {
+    // 从后端API获取AI模型配置
+    const models = await GetAIModels()
+    aiModels.value = models || []
+  } catch (error) {
+    console.error('获取AI模型配置失败:', error)
+    aiModels.value = []
   }
 })
 </script>

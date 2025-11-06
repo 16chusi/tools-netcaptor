@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -72,35 +71,35 @@ func (we *WorkflowExecutor) executeDownload(step ExecutionStep) (ExecutionResult
 			savePath = filepath.Join(saveDirectory, filename)
 		}
 
-		log.Printf("[Workflow] 下载文件 %d/%d: %s -> %s", i+1, len(urls), url, savePath)
+		AppLog.Info(fmt.Sprintf("[Workflow] 下载文件 %d/%d: %s -> %s", i+1, len(urls), url, savePath))
 
 		resp, err := http.Get(url)
 		if err != nil {
-			log.Printf("[Workflow] 下载失败: %v", err)
+			AppLog.Info(fmt.Sprintf("[Workflow] 下载失败: %v", err))
 			continue
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			log.Printf("[Workflow] 下载失败: HTTP %d", resp.StatusCode)
+			AppLog.Info(fmt.Sprintf("[Workflow] 下载失败: HTTP %d", resp.StatusCode))
 			continue
 		}
 
 		file, err := os.Create(savePath)
 		if err != nil {
-			log.Printf("[Workflow] 创建文件失败: %v", err)
+			AppLog.Info(fmt.Sprintf("[Workflow] 创建文件失败: %v", err))
 			continue
 		}
 		defer file.Close()
 
 		_, err = io.Copy(file, resp.Body)
 		if err != nil {
-			log.Printf("[Workflow] 写入文件失败: %v", err)
+			AppLog.Info(fmt.Sprintf("[Workflow] 写入文件失败: %v", err))
 			os.Remove(savePath)
 			continue
 		}
 
-		log.Printf("[Workflow] ✓ 下载成功: %s", filename)
+		AppLog.Info(fmt.Sprintf("[Workflow] ✓ 下载成功: %s", filename))
 		downloadedFiles = append(downloadedFiles, savePath)
 	}
 

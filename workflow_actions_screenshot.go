@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -11,7 +10,7 @@ import (
 
 // executeScreenshot 执行网页截图
 func (we *WorkflowExecutor) executeScreenshot(step ExecutionStep) (ExecutionResult, error) {
-	log.Printf("[Workflow] WebSocket 运行状态: %v, 客户端连接: %v", we.wsServer.IsRunning(), we.wsServer.HasClients())
+	AppLog.Info(fmt.Sprintf("[Workflow] WebSocket 运行状态: %v, 客户端连接: %v", we.wsServer.IsRunning(), we.wsServer.HasClients()))
 
 	format, _ := step.Params["format"].(string)
 	if format == "" {
@@ -61,7 +60,7 @@ func (we *WorkflowExecutor) executeScreenshot(step ExecutionStep) (ExecutionResu
 	}
 	fullPath := filepath.Join(saveDirectory, filename)
 
-	log.Printf("[Workflow] 执行截图: format=%s, captureType=%s, quality=%d, path=%s", format, captureType, quality, fullPath)
+	AppLog.Info(fmt.Sprintf("[Workflow] 执行截图: format=%s, captureType=%s, quality=%d, path=%s", format, captureType, quality, fullPath))
 
 	msg := WSMessage{
 		Type: "screenshot",
@@ -98,7 +97,7 @@ func (we *WorkflowExecutor) executeScreenshot(step ExecutionStep) (ExecutionResu
 				return ExecutionResult{Success: false}, fmt.Errorf("保存截图失败: %w", err)
 			}
 
-			log.Printf("[Workflow] ✓ 截图已保存: %s", fullPath)
+			AppLog.Info(fmt.Sprintf("[Workflow] ✓ 截图已保存: %s", fullPath))
 			result.Message = fmt.Sprintf("截图已保存: %s", filename)
 		} else {
 			return ExecutionResult{Success: false}, fmt.Errorf("未收到截图数据")

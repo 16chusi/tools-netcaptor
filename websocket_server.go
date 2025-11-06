@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"net/http"
 	"sync"
@@ -57,9 +56,9 @@ func (ws *WebSocketServer) Start() error {
 	ws.running = true
 
 	go func() {
-		log.Printf("[WebSocket] 服务器启动在端口 %d", ws.wsPort)
+		AppLog.Info(fmt.Sprintf("[WebSocket] 服务器启动在端口 %d", ws.wsPort))
 		if err := ws.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("[WebSocket] 服务器错误: %v", err)
+			AppLog.Info(fmt.Sprintf("[WebSocket] 服务器错误: %v", err))
 			ws.running = false
 		}
 	}()
@@ -75,7 +74,7 @@ func (ws *WebSocketServer) Stop() error {
 	ws.running = false
 	err := ws.server.Close()
 	ws.server = nil
-	log.Printf("[WebSocket] 服务器已停止")
+	AppLog.Info(fmt.Sprintf("[WebSocket] 服务器已停止"))
 	return err
 }
 
@@ -102,7 +101,7 @@ func (ws *WebSocketServer) corsMiddleware(next http.Handler) http.Handler {
 func (ws *WebSocketServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := ws.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("[WebSocket] 升级失败: %v", err)
+		AppLog.Info(fmt.Sprintf("[WebSocket] 升级失败: %v", err))
 		return
 	}
 
@@ -110,14 +109,14 @@ func (ws *WebSocketServer) HandleWebSocket(w http.ResponseWriter, r *http.Reques
 	ws.clients[conn] = true
 	ws.mu.Unlock()
 
-	log.Printf("[WebSocket] 客户端已连接,当前连接数: %d", len(ws.clients))
+	AppLog.Info(fmt.Sprintf("[WebSocket] 客户端已连接,当前连接数: %d", len(ws.clients)))
 
 	defer func() {
 		ws.mu.Lock()
 		delete(ws.clients, conn)
 		ws.mu.Unlock()
 		conn.Close()
-		log.Printf("[WebSocket] 客户端已断开,当前连接数: %d", len(ws.clients))
+		AppLog.Info(fmt.Sprintf("[WebSocket] 客户端已断开,当前连接数: %d", len(ws.clients)))
 	}()
 
 	for {
@@ -125,7 +124,7 @@ func (ws *WebSocketServer) HandleWebSocket(w http.ResponseWriter, r *http.Reques
 		err := conn.ReadJSON(&msg)
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("[WebSocket] 读取错误: %v", err)
+				AppLog.Info(fmt.Sprintf("[WebSocket] 读取错误: %v", err))
 			}
 			break
 		}
@@ -135,7 +134,7 @@ func (ws *WebSocketServer) HandleWebSocket(w http.ResponseWriter, r *http.Reques
 }
 
 func (ws *WebSocketServer) handleMessage(conn *websocket.Conn, msg WSMessage) {
-	log.Printf("[WebSocket] 收到消息: %s", msg.Type)
+	LogDebug(fmt.Sprintf("[WebSocket] 收到消息: %s", msg.Type))
 
 	switch msg.Type {
 	case "connection":
@@ -155,38 +154,38 @@ func (ws *WebSocketServer) handleMessage(conn *websocket.Conn, msg WSMessage) {
 		}
 
 	case "action_result":
-		log.Printf("[WebSocket服务器] 收到action_result消息: %+v", msg.Data)
+		AppLog.Info(fmt.Sprintf("[WebSocket服务器] 收到action_result消息: %+v", msg.Data))
 		// 转发给工作流执行器
 		if ws.app.workflowExecutor != nil {
-			log.Printf("[WebSocket服务器] 转发消息给工作流执行器")
+			AppLog.Info(fmt.Sprintf("[WebSocket服务器] 转发消息给工作流执行器"))
 			ws.app.workflowExecutor.HandleResponse(msg)
 		} else {
-			log.Printf("[WebSocket服务器] 工作流执行器为空，无法转发消息")
+			AppLog.Info(fmt.Sprintf("[WebSocket服务器] 工作流执行器为空，无法转发消息"))
 		}
 
 	case "screenshot":
-		log.Printf("[WebSocket服务器] 收到screenshot消息")
+		AppLog.Info(fmt.Sprintf("[WebSocket服务器] 收到screenshot消息"))
 		// 转发给工作流执行器
 		if ws.app.workflowExecutor != nil {
 			ws.app.workflowExecutor.HandleResponse(msg)
 		}
 
 	case "get_page_info":
-		log.Printf("[WebSocket服务器] 收到get_page_info消息")
+		AppLog.Info(fmt.Sprintf("[WebSocket服务器] 收到get_page_info消息"))
 		// 转发给工作流执行器
 		if ws.app.workflowExecutor != nil {
 			ws.app.workflowExecutor.HandleResponse(msg)
 		}
 
 	case "get_page_dom":
-		log.Printf("[WebSocket服务器] 收到get_page_dom消息")
+		AppLog.Info(fmt.Sprintf("[WebSocket服务器] 收到get_page_dom消息"))
 		// 转发给工作流执行器
 		if ws.app.workflowExecutor != nil {
 			ws.app.workflowExecutor.HandleResponse(msg)
 		}
 
 	default:
-		log.Printf("[WebSocket] 未知消息类型: %s", msg.Type)
+		AppLog.Info(fmt.Sprintf("[WebSocket] 未知消息类型: %s", msg.Type))
 	}
 }
 
@@ -198,14 +197,14 @@ func (ws *WebSocketServer) Broadcast(msg WSMessage) {
 	ws.mu.RLock()
 	defer ws.mu.RUnlock()
 
-	log.Printf("[WebSocket] 广播消息给 %d 个客户端: %s", len(ws.clients), msg.Type)
+	AppLog.Info(fmt.Sprintf("[WebSocket] 广播消息给 %d 个客户端: %s", len(ws.clients), msg.Type))
 
 	for client := range ws.clients {
 		err := client.WriteJSON(msg)
 		if err != nil {
-			log.Printf("[WebSocket] ❌ 广播失败: %v", err)
+			AppLog.Info(fmt.Sprintf("[WebSocket] ❌ 广播失败: %v", err))
 		} else {
-			log.Printf("[WebSocket] ✅ 消息已发送给客户端")
+			AppLog.Info(fmt.Sprintf("[WebSocket] ✅ 消息已发送给客户端"))
 		}
 	}
 }

@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
-	"log"
 
 	"github.com/tjfoc/gmsm/sm4"
 )
@@ -57,7 +56,7 @@ func (we *WorkflowExecutor) executeDecrypt(step ExecutionStep) (ExecutionResult,
 
 	if saveToVariable, ok := step.Params["saveToVariable"].(string); ok && saveToVariable != "" {
 		we.variables[saveToVariable] = decrypted
-		log.Printf("[Workflow] ✓ 解密完成，保存到变量: %s", saveToVariable)
+		AppLog.Info(fmt.Sprintf("[Workflow] ✓ 解密完成，保存到变量: %s", saveToVariable))
 	}
 
 	return ExecutionResult{

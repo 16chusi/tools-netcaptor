@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -48,9 +47,9 @@ func (we *WorkflowExecutor) Execute(task WorkflowTask) error {
 		we.mu.Unlock()
 	}()
 
-	log.Printf("[Workflow] ========== 开始执行任务 ==========")
-	log.Printf("[Workflow] 任务名称: %s", task.Name)
-	log.Printf("[Workflow] 任务ID: %s", task.ID)
+	AppLog.Info(fmt.Sprintf("[Workflow] ========== 开始执行任务 =========="))
+	AppLog.Info(fmt.Sprintf("[Workflow] 任务名称: %s", task.Name))
+	AppLog.Info(fmt.Sprintf("[Workflow] 任务ID: %s", task.ID))
 
 	return we.executeFromNode(task, we.findStartNode(task), 0)
 }
@@ -68,7 +67,7 @@ func (we *WorkflowExecutor) executeFromNode(task WorkflowTask, nodeID string, st
 
 	// 结束节点
 	if node.Type == "end" {
-		log.Printf("[Workflow] 到达结束节点")
+		AppLog.Info(fmt.Sprintf("[Workflow] 到达结束节点"))
 		we.emitStatus(ExecutionStatus{
 			TaskID:      task.ID,
 			CurrentStep: stepCount,
@@ -100,7 +99,7 @@ func (we *WorkflowExecutor) executeFromNode(task WorkflowTask, nodeID string, st
 	}
 
 	stepCount++
-	log.Printf("[Workflow] 执行步骤 %d: %s", stepCount, node.Type)
+	LogDebug(fmt.Sprintf("[Workflow] 执行步骤 %d: %s", stepCount, node.Type))
 
 	we.emitStatus(ExecutionStatus{
 		TaskID:      task.ID,
@@ -112,19 +111,19 @@ func (we *WorkflowExecutor) executeFromNode(task WorkflowTask, nodeID string, st
 
 	// jsonl_reader 节点特殊处理
 	if node.Type == "jsonl_reader" {
-		log.Printf("[工作流执行器] 发现JSONL读取器节点: %s", nodeID)
+		AppLog.Info(fmt.Sprintf("[工作流执行器] 发现JSONL读取器节点: %s", nodeID))
 		step := ExecutionStep{
 			NodeID: nodeID,
 			Action: node.Type,
 			Params: node.Data,
 		}
 		we.replaceVariables(&step)
-		log.Printf("[工作流执行器] 准备执行JSONL读取器，参数: %+v", step.Params)
+		AppLog.Info(fmt.Sprintf("[工作流执行器] 准备执行JSONL读取器，参数: %+v", step.Params))
 
 		err := we.executeJSONLReader(step, task, stepCount)
 		if err != nil {
 			errMsg := fmt.Sprintf("步骤执行失败: %v", err)
-			log.Printf("[工作流执行器] JSONL读取器执行失败: %s", errMsg)
+			AppLog.Info(fmt.Sprintf("[工作流执行器] JSONL读取器执行失败: %s", errMsg))
 			we.emitStatus(ExecutionStatus{
 				TaskID:       task.ID,
 				CurrentStep:  stepCount,
@@ -136,7 +135,7 @@ func (we *WorkflowExecutor) executeFromNode(task WorkflowTask, nodeID string, st
 			return err
 		}
 		// JSONL读取器执行完成，循环体已经包含了所有后续节点，直接返回
-		log.Printf("[Workflow] JSONL读取器循环执行完成")
+		AppLog.Info(fmt.Sprintf("[Workflow] JSONL读取器循环执行完成"))
 		endNodeID := we.findEndNode(task)
 		we.emitStatus(ExecutionStatus{
 			TaskID:      task.ID,
@@ -160,7 +159,7 @@ func (we *WorkflowExecutor) executeFromNode(task WorkflowTask, nodeID string, st
 		nextNodeID, err := we.executeIf(step, task)
 		if err != nil {
 			errMsg := fmt.Sprintf("步骤执行失败: %v", err)
-			log.Printf("[Workflow] %s", errMsg)
+			AppLog.Info(fmt.Sprintf("[Workflow] %s", errMsg))
 			we.emitStatus(ExecutionStatus{
 				TaskID:       task.ID,
 				CurrentStep:  stepCount,
@@ -186,7 +185,7 @@ func (we *WorkflowExecutor) executeFromNode(task WorkflowTask, nodeID string, st
 		err := we.executeFor(step, task, stepCount)
 		if err != nil {
 			errMsg := fmt.Sprintf("步骤执行失败: %v", err)
-			log.Printf("[Workflow] %s", errMsg)
+			AppLog.Info(fmt.Sprintf("[Workflow] %s", errMsg))
 			we.emitStatus(ExecutionStatus{
 				TaskID:       task.ID,
 				CurrentStep:  stepCount,
@@ -215,16 +214,24 @@ func (we *WorkflowExecutor) executeFromNode(task WorkflowTask, nodeID string, st
 		Params: node.Data,
 	}
 
-	log.Printf("[Workflow] ========== 执行节点前的变量 ==========")
+	LogDebug(fmt.Sprintf("[Workflow] ========== 执行节点前的变量 =========="))
 	for key, value := range we.variables {
-		log.Printf("[Workflow]   %s (%T) = %v", key, value, value)
+		AppLog.Info(fmt.Sprintf("[Workflow]   %s (%T) = %v", key, value, value))
 	}
-	log.Printf("[Workflow] =====================================")
+	AppLog.Info(fmt.Sprintf("[Workflow] ====================================="))
 
 	result, err := we.executeStep(step)
 	if err != nil {
-		errMsg := fmt.Sprintf("步骤执行失败: %v", err)
-		log.Printf("[Workflow] %s", errMsg)
+		// 获取节点显示名称
+		nodeDisplayName := node.Type
+		if label, ok := node.Data["label"].(string); ok && label != "" {
+			nodeDisplayName = label
+		}
+
+		errMsg := fmt.Sprintf("节点执行失败: [%s] (ID: %s, 类型: %s) - %v",
+			nodeDisplayName, nodeID, node.Type, err)
+		LogError(errMsg)
+
 		we.emitStatus(ExecutionStatus{
 			TaskID:       task.ID,
 			CurrentStep:  stepCount,
@@ -233,16 +240,16 @@ func (we *WorkflowExecutor) executeFromNode(task WorkflowTask, nodeID string, st
 			CurrentNode:  nodeID,
 			ErrorMessage: errMsg,
 		})
-		return err
+		return fmt.Errorf(errMsg)
 	}
 
-	log.Printf("[Workflow] 步骤完成: %v", result.Message)
-	log.Printf("[Workflow] 节点返回的 result.Data: %+v", result.Data)
-	log.Printf("[Workflow] ========== 执行节点后的变量 ==========")
+	LogDebug(fmt.Sprintf("[Workflow] 步骤完成: %v", result.Message))
+	AppLog.Info(fmt.Sprintf("[Workflow] 节点返回的 result.Data: %+v", result.Data))
+	LogDebug(fmt.Sprintf("[Workflow] ========== 执行节点后的变量 =========="))
 	for key, value := range we.variables {
-		log.Printf("[Workflow]   %s (%T) = %v", key, value, value)
+		AppLog.Info(fmt.Sprintf("[Workflow]   %s (%T) = %v", key, value, value))
 	}
-	log.Printf("[Workflow] =====================================")
+	AppLog.Info(fmt.Sprintf("[Workflow] ====================================="))
 
 	// 查找下一个节点
 	nextNodeID := we.findNextNode(task, nodeID, "")

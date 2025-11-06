@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 )
@@ -27,7 +26,7 @@ func (we *WorkflowExecutor) executeIf(step ExecutionStep, task WorkflowTask) (st
 		falsePort = "left"
 	}
 
-	log.Printf("[Workflow] 评估条件: %s %s %s", leftValue, operator, rightValue)
+	AppLog.Info(fmt.Sprintf("[Workflow] 评估条件: %s %s %s", leftValue, operator, rightValue))
 
 	// 评估条件
 	result, err := we.compare(leftValue, operator, rightValue)
@@ -39,9 +38,9 @@ func (we *WorkflowExecutor) executeIf(step ExecutionStep, task WorkflowTask) (st
 	targetPort := falsePort
 	if result {
 		targetPort = truePort
-		log.Printf("[Workflow] 条件为 true，选择端口: %s", targetPort)
+		AppLog.Info(fmt.Sprintf("[Workflow] 条件为 true，选择端口: %s", targetPort))
 	} else {
-		log.Printf("[Workflow] 条件为 false，选择端口: %s", targetPort)
+		AppLog.Info(fmt.Sprintf("[Workflow] 条件为 false，选择端口: %s", targetPort))
 	}
 
 	// 查找从指定端口出发的边
@@ -52,7 +51,7 @@ func (we *WorkflowExecutor) executeIf(step ExecutionStep, task WorkflowTask) (st
 		}
 
 		if edge.Source == step.NodeID && edgeSourcePort == targetPort {
-			log.Printf("[Workflow] 找到匹配的边: %s -> %s (端口: %s)", edge.Source, edge.Target, targetPort)
+			AppLog.Info(fmt.Sprintf("[Workflow] 找到匹配的边: %s -> %s (端口: %s)", edge.Source, edge.Target, targetPort))
 			return edge.Target, nil
 		}
 	}

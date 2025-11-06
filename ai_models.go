@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -62,7 +61,7 @@ func NewAIService(proxyConfigMgr *ProxyConfigManager, smartProxyMgr *SmartProxyM
 		},
 	}
 
-	log.Printf("[AI服务] 初始化AI服务，默认模型数量: %d", len(defaultModels))
+	AppLog.Info(fmt.Sprintf("[AI服务] 初始化AI服务，默认模型数量: %d", len(defaultModels)))
 
 	return &AIService{
 		models:         defaultModels,
@@ -91,15 +90,20 @@ type AICustomSettings struct {
 
 // CallAIWithImages 调用AI接口处理图片内容
 func (s *AIService) CallAIWithImages(modelIndex int, prompt string, imageUrls []string, customSettings *AICustomSettings) (string, error) {
-	log.Printf("[AI服务] 图片处理请求 - 模型索引: %d, 可用模型数量: %d", modelIndex, len(s.models))
+	LogDebug(fmt.Sprintf("[AI服务] 图片处理请求 - 模型索引: %d, 可用模型数量: %d", modelIndex, len(s.models)))
 
 	if len(s.models) == 0 {
-		log.Printf("[AI服务] ❌ 没有配置任何AI模型")
+		LogError("[AI服务] ❌ 没有配置任何AI模型")
 		return "", fmt.Errorf("没有配置AI模型，请先在设置中配置AI模型")
 	}
 
+	LogDebug(fmt.Sprintf("[AI服务] 可用模型列表:"))
+	for i, model := range s.models {
+		LogDebug(fmt.Sprintf("[AI服务] 模型 %d: %s (%s)", i, model.Name, model.Provider))
+	}
+
 	if modelIndex >= len(s.models) {
-		log.Printf("[AI服务] ❌ 模型索引 %d 超出范围，可用模型: %d 个", modelIndex, len(s.models))
+		LogError(fmt.Sprintf("[AI服务] ❌ 模型索引 %d 超出范围，可用模型: %d 个", modelIndex, len(s.models)))
 		return "", fmt.Errorf("模型索引超出范围，请选择有效的模型 (0-%d)", len(s.models)-1)
 	}
 
@@ -157,15 +161,15 @@ func (s *AIService) CallAIWithImages(modelIndex int, prompt string, imageUrls []
 
 // CallAIWithCustomSettings 调用AI接口（带重试和自定义设置）
 func (s *AIService) CallAIWithCustomSettings(modelIndex int, prompt string, systemPrompt string, retryCount int, retryDelay int, customSettings *AICustomSettings) (string, error) {
-	log.Printf("[AI服务] 文本处理请求 - 模型索引: %d, 可用模型数量: %d", modelIndex, len(s.models))
+	AppLog.Info(fmt.Sprintf("[AI服务] 文本处理请求 - 模型索引: %d, 可用模型数量: %d", modelIndex, len(s.models)))
 
 	if len(s.models) == 0 {
-		log.Printf("[AI服务] ❌ 没有配置任何AI模型")
+		AppLog.Info(fmt.Sprintf("[AI服务] ❌ 没有配置任何AI模型"))
 		return "", fmt.Errorf("没有配置AI模型，请先在设置中配置AI模型")
 	}
 
 	if modelIndex >= len(s.models) {
-		log.Printf("[AI服务] ❌ 模型索引 %d 超出范围，可用模型: %d 个", modelIndex, len(s.models))
+		AppLog.Info(fmt.Sprintf("[AI服务] ❌ 模型索引 %d 超出范围，可用模型: %d 个", modelIndex, len(s.models)))
 		return "", fmt.Errorf("模型索引超出范围，请选择有效的模型 (0-%d)", len(s.models)-1)
 	}
 
@@ -189,7 +193,7 @@ func (s *AIService) CallAIWithCustomSettings(modelIndex int, prompt string, syst
 	// 重试逻辑
 	for attempt := 0; attempt <= retryCount; attempt++ {
 		if attempt > 0 {
-			fmt.Printf("[AI服务] 第 %d 次重试，等待 %d 秒...\n", attempt, retryDelay)
+			AppLog.Info(fmt.Sprintf("[AI服务] 第 %d 次重试，等待 %d 秒...\n", attempt, retryDelay))
 			time.Sleep(time.Duration(retryDelay) * time.Second)
 		}
 
@@ -210,17 +214,17 @@ func (s *AIService) CallAIWithCustomSettings(modelIndex int, prompt string, syst
 
 		if err == nil {
 			if attempt > 0 {
-				fmt.Printf("[AI服务] 重试成功，第 %d 次尝试\n", attempt+1)
+				AppLog.Info(fmt.Sprintf("[AI服务] 重试成功，第 %d 次尝试\n", attempt+1))
 			}
 			return result, nil
 		}
 
 		lastErr = err
-		fmt.Printf("[AI服务] 第 %d 次尝试失败: %v\n", attempt+1, err)
+		AppLog.Info(fmt.Sprintf("[AI服务] 第 %d 次尝试失败: %v\n", attempt+1, err))
 
 		// 检查是否是可重试的错误
 		if !isRetryableError(err) {
-			fmt.Printf("[AI服务] 不可重试的错误，停止重试\n")
+			AppLog.Info(fmt.Sprintf("[AI服务] 不可重试的错误，停止重试\n"))
 			break
 		}
 	}
@@ -398,22 +402,27 @@ func (s *AIService) makeHTTPRequest(url, apiKey string, request AIRequest, authT
 
 // UpdateModels 更新模型配置
 func (s *AIService) UpdateModels(models []AIModel) {
-	log.Printf("[AI服务] 更新模型配置，新模型数量: %d", len(models))
+	LogInfo(fmt.Sprintf("[AI服务] 更新模型配置，新模型数量: %d", len(models)))
 	s.models = models
 
 	// 如果没有配置模型，保留默认模型
 	if len(s.models) == 0 {
-		log.Printf("[AI服务] ⚠️ 没有提供模型配置，保持默认模型")
+		LogWarning("[AI服务] ⚠️ 没有提供模型配置，保持默认模型")
 	} else {
 		for i, model := range s.models {
-			log.Printf("[AI服务] 模型 %d: %s (%s)", i, model.Name, model.Provider)
+			LogDebug(fmt.Sprintf("[AI服务] 模型 %d: %s (%s)", i, model.Name, model.Provider))
 		}
 	}
 }
 
+// GetModels 获取当前模型配置
+func (s *AIService) GetModels() []AIModel {
+	return s.models
+}
+
 // TestModel 测试模型连接
 func (s *AIService) TestModel(model AIModel) error {
-	fmt.Printf("[AI服务] 测试模型连接: %s (%s)\n", model.Name, model.Provider)
+	AppLog.Info(fmt.Sprintf("[AI服务] 测试模型连接: %s (%s)\n", model.Name, model.Provider))
 
 	testRequest := AIRequest{
 		Model: model.Name,
@@ -426,23 +435,23 @@ func (s *AIService) TestModel(model AIModel) error {
 	var err error
 	switch model.Provider {
 	case "openai":
-		fmt.Printf("[AI服务] 调用OpenAI API\n")
+		AppLog.Info(fmt.Sprintf("[AI服务] 调用OpenAI API\n"))
 		_, err = s.callOpenAI(model, testRequest)
 	case "anthropic":
-		fmt.Printf("[AI服务] 调用Anthropic API\n")
+		AppLog.Info(fmt.Sprintf("[AI服务] 调用Anthropic API\n"))
 		_, err = s.callAnthropic(model, testRequest)
 	case "azure":
-		fmt.Printf("[AI服务] 调用Azure OpenAI API\n")
+		AppLog.Info(fmt.Sprintf("[AI服务] 调用Azure OpenAI API\n"))
 		_, err = s.callAzureOpenAI(model, testRequest)
 	default:
-		fmt.Printf("[AI服务] 调用自定义API\n")
+		AppLog.Info(fmt.Sprintf("[AI服务] 调用自定义API\n"))
 		_, err = s.callCustomAPI(model, testRequest)
 	}
 
 	if err != nil {
-		fmt.Printf("[AI服务] API调用失败: %v\n", err)
+		AppLog.Info(fmt.Sprintf("[AI服务] API调用失败: %v\n", err))
 	} else {
-		fmt.Printf("[AI服务] API调用成功\n")
+		AppLog.Info(fmt.Sprintf("[AI服务] API调用成功\n"))
 	}
 
 	return err

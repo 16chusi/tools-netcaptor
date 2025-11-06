@@ -11,6 +11,7 @@ require (
 	github.com/playwright-community/playwright-go v0.5200.1
 	github.com/tjfoc/gmsm v1.4.1
 	github.com/wailsapp/wails/v2 v2.10.2
+	gopkg.in/ini.v1 v1.67.0
 )
 
 require (

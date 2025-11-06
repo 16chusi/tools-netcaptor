@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/chromedp/chromedp"
@@ -33,7 +32,9 @@ func (c *ChromeDPManager) Init() error {
 	)
 
 	allocCtx, _ := chromedp.NewExecAllocator(context.Background(), opts...)
-	ctx, cancel := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
+	ctx, cancel := chromedp.NewContext(allocCtx, chromedp.WithLogf(func(format string, args ...interface{}) {
+		AppLog.Info(fmt.Sprintf(format, args...))
+	}))
 
 	c.ctx = ctx
 	c.cancel = cancel

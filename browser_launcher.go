@@ -7,9 +7,9 @@ import (
 )
 
 func OpenInChrome(url string, proxyURL string) error {
-	fmt.Printf("[Browser] 🌐 启动Chrome浏览器\n")
-	fmt.Printf("[Browser] 📍 目标URL: %s\n", url)
-	fmt.Printf("[Browser] 🔗 代理设置: %s\n", proxyURL)
+	AppLog.Info(fmt.Sprintf("[Browser] 🌐 启动Chrome浏览器\n"))
+	AppLog.Info(fmt.Sprintf("[Browser] 📍 目标URL: %s\n", url))
+	AppLog.Info(fmt.Sprintf("[Browser] 🔗 代理设置: %s\n", proxyURL))
 
 	var cmd *exec.Cmd
 

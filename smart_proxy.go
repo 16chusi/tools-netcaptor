@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -70,7 +69,7 @@ func (sm *SmartProxyManager) LoadRules() error {
 		return fmt.Errorf("解析规则文件失败: %w", err)
 	}
 
-	log.Printf("[SmartProxy] 加载了 %d 条路由规则", len(sm.rules))
+	AppLog.Info(fmt.Sprintf("[SmartProxy] 加载了 %d 条路由规则", len(sm.rules)))
 	return nil
 }
 
@@ -131,12 +130,12 @@ func (sm *SmartProxyManager) DecideRoute(host string) string {
 		rule.LastUsed = time.Now()
 		sm.SaveRules()
 
-		log.Printf("[SmartProxy] %s 匹配规则: %s -> %s (%s)", host, rule.Pattern, rule.RouteType, rule.Source)
+		AppLog.Info(fmt.Sprintf("[SmartProxy] %s 匹配规则: %s -> %s (%s)", host, rule.Pattern, rule.RouteType, rule.Source))
 		return rule.RouteType
 	}
 
 	// 没有匹配规则，默认直连
-	log.Printf("[SmartProxy] %s 无匹配规则，使用直连", host)
+	AppLog.Info(fmt.Sprintf("[SmartProxy] %s 无匹配规则，使用直连", host))
 	return "direct"
 }
 
@@ -206,7 +205,7 @@ func (sm *SmartProxyManager) LearnFromFailure(host string, reason string) {
 	sm.rules = append(sm.rules, rule)
 	sm.SaveRules()
 
-	log.Printf("[SmartProxy] 自动学习: %s 直连失败(%s)，添加代理规则", host, reason)
+	AppLog.Info(fmt.Sprintf("[SmartProxy] 自动学习: %s 直连失败(%s)，添加代理规则", host, reason))
 }
 
 // AddManualRule 添加手动规则
@@ -234,7 +233,7 @@ func (sm *SmartProxyManager) AddManualRule(pattern, routeType string) error {
 	}
 
 	sm.rules = append(sm.rules, rule)
-	log.Printf("[SmartProxy] 添加手动规则: %s -> %s", pattern, routeType)
+	AppLog.Info(fmt.Sprintf("[SmartProxy] 添加手动规则: %s -> %s", pattern, routeType))
 	return sm.SaveRules()
 }
 
@@ -243,7 +242,7 @@ func (sm *SmartProxyManager) RemoveRule(id string) error {
 	for i, rule := range sm.rules {
 		if rule.ID == id {
 			sm.rules = append(sm.rules[:i], sm.rules[i+1:]...)
-			log.Printf("[SmartProxy] 删除规则: %s", rule.Pattern)
+			AppLog.Info(fmt.Sprintf("[SmartProxy] 删除规则: %s", rule.Pattern))
 			return sm.SaveRules()
 		}
 	}
@@ -267,6 +266,6 @@ func (sm *SmartProxyManager) ClearAutoLearnedRules() error {
 	removed := len(sm.rules) - len(newRules)
 	sm.rules = newRules
 
-	log.Printf("[SmartProxy] 清空了 %d 条自动学习规则", removed)
+	AppLog.Info(fmt.Sprintf("[SmartProxy] 清空了 %d 条自动学习规则", removed))
 	return sm.SaveRules()
 }

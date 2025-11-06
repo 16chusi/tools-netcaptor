@@ -28,11 +28,8 @@
             </div>
           </div>
           <div class="model-actions">
-            <button @click="testModel(index)" class="test-btn" :disabled="!model.apiKey || testingStates[index]">
-              {{ testingStates[index] ? '测试中...' : '测试连接' }}
-            </button>
-            <button @click="quickTest(index)" class="quick-test-btn" :disabled="!model.apiKey || testingStates[index]">
-              {{ testingStates[index] ? '测试中...' : '快速测试' }}
+            <button @click="testAndSaveModel(index)" class="test-btn" :disabled="!model.apiKey || testingStates[index]">
+              {{ testingStates[index] ? '测试中...' : '测试并保存' }}
             </button>
             <button @click="removeModel(index)" class="remove-btn">删除</button>
           </div>
@@ -80,7 +77,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, reactive } from 'vue'
 import { toast } from '../../utils/toast'
-import { TestAIModel, UpdateAIModels, CallAI, ShowQuestionDialog } from '../../../wailsjs/go/main/NetworkApp'
+import { TestAIModel, UpdateAIModels, GetAIModels, CallAI, ShowQuestionDialog } from '../../../wailsjs/go/main/NetworkApp'
 
 interface AIModel {
   provider: string
@@ -155,11 +152,11 @@ function setTestResult(index: number, type: 'success' | 'error', title: string, 
   }
 }
 
-async function testModel(index: number) {
-  const key = `test-${index}`
+async function testAndSaveModel(index: number) {
+  const key = `test-save-${index}`
   debounce(key, async () => {
     const model = models.value[index]
-    console.log('[前端] 测试模型:', model)
+    console.log('[前端] 测试并保存模型:', model)
     
     if (!model.apiKey) {
       setTestResult(index, 'error', '测试失败', '请先配置API Key')
@@ -169,44 +166,41 @@ async function testModel(index: number) {
     testingStates[index] = true
     
     try {
-      console.log('[前端] 调用TestAIModel...')
+      // 第一步：测试连接
+      console.log('[前端] 步骤1: 测试模型连接...')
       await TestAIModel(model)
-      console.log('[前端] TestAIModel调用成功')
-      setTestResult(index, 'success', '连接测试成功', '模型API连接正常')
+      
+      // 第二步：AI响应测试
+      console.log('[前端] 步骤2: 测试AI响应...')
+      await UpdateAIModels(models.value) // 先更新配置
+      const result = await CallAI(index, "Hello", "You are a helpful assistant. Reply with just 'OK'.")
+      
+      // 第三步：保存到数据库
+      console.log('[前端] 步骤3: 保存配置到数据库...')
+      await saveModels()
+      
+      setTestResult(index, 'success', '测试成功并已保存', 
+        `连接正常，AI响应: ${result.substring(0, 50)}${result.length > 50 ? '...' : ''}`)
+      
     } catch (error: any) {
-      console.error('[前端] AI模型测试失败:', error)
-      setTestResult(index, 'error', '连接测试失败', error.message)
+      console.error('[前端] 测试或保存失败:', error)
+      setTestResult(index, 'error', '测试失败', error.message)
     } finally {
       testingStates[index] = false
     }
   })
 }
 
-async function quickTest(index: number) {
-  const key = `quick-${index}`
-  debounce(key, async () => {
-    const model = models.value[index]
-    
-    if (!model.apiKey) {
-      setTestResult(index, 'error', '测试失败', '请先配置API Key')
-      return
-    }
-    
-    testingStates[index] = true
-    
-    try {
-      // 先更新模型配置到后端
-      await UpdateAIModels(models.value)
-      // 然后调用AI进行快速测试
-      const result = await CallAI(index, "Hello", "You are a helpful assistant. Reply with just 'OK'.")
-      setTestResult(index, 'success', 'AI响应测试成功', `响应: ${result.substring(0, 100)}${result.length > 100 ? '...' : ''}`)
-    } catch (error: any) {
-      console.error('AI快速测试失败:', error)
-      setTestResult(index, 'error', 'AI响应测试失败', error.message)
-    } finally {
-      testingStates[index] = false
-    }
-  })
+async function saveModels() {
+  try {
+    // 保存到后端数据库
+    await UpdateAIModels(models.value)
+    // 同时保存到localStorage作为备份
+    saveSettings()
+  } catch (error) {
+    console.error('保存模型配置失败:', error)
+    throw error
+  }
 }
 
 function saveSettings() {
@@ -236,12 +230,34 @@ function loadSettings() {
   }
 }
 
-onMounted(() => {
-  loadSettings()
+onMounted(async () => {
+  try {
+    // 从后端数据库加载
+    const savedModels = await GetAIModels()
+    if (savedModels && savedModels.length > 0) {
+      models.value = savedModels
+      console.log('[AIModelTab] 从数据库加载了', savedModels.length, '个模型')
+    } else {
+      // 如果数据库为空，尝试从 localStorage 加载
+      loadSettings()
+    }
+  } catch (error) {
+    console.error('[AIModelTab] 加载模型失败，使用 localStorage:', error)
+    loadSettings()
+  }
 })
 
 // 监听变化自动保存
-watch([models, defaultModel, defaultTemperature, defaultMaxTokens], saveSettings, { deep: true })
+watch([models, defaultModel, defaultTemperature, defaultMaxTokens], () => {
+  debounce('auto-save', async () => {
+    try {
+      await UpdateAIModels(models.value)
+      saveSettings() // 同时保存到 localStorage 作为备份
+    } catch (error) {
+      console.error('自动保存失败:', error)
+    }
+  }, 2000)
+}, { deep: true })
 </script>
 
 <style scoped>

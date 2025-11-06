@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"time"
 )
@@ -14,17 +13,17 @@ func (we *WorkflowExecutor) executeJSONLReader(step ExecutionStep, task Workflow
 
 // executeJSONLReaderWithDepth 执行JSONL读取器（支持嵌套深度控制）
 func (we *WorkflowExecutor) executeJSONLReaderWithDepth(step ExecutionStep, task WorkflowTask, stepCount int, depth int) error {
-	log.Printf("[JSONL读取器] ========== 开始执行 (深度:%d) ==========", depth)
-	log.Printf("[JSONL读取器] 参数: %+v", step.Params)
-	
+	AppLog.Info(fmt.Sprintf("[JSONL读取器] ========== 开始执行 (深度:%d) ==========", depth))
+	LogDebug(fmt.Sprintf("[Action] 参数: %+v", step.Params))
+
 	// 获取文件路径
 	filePath, ok := step.Params["filePath"].(string)
 	if !ok || filePath == "" {
-		log.Printf("[JSONL读取器] 错误: 缺少 filePath 参数")
+		AppLog.Info(fmt.Sprintf("[JSONL读取器] 错误: 缺少 filePath 参数"))
 		return fmt.Errorf("缺少 filePath 参数")
 	}
-	
-	log.Printf("[JSONL读取器] 文件路径: %s", filePath)
+
+	AppLog.Info(fmt.Sprintf("[JSONL读取器] 文件路径: %s", filePath))
 
 	// 获取提取字段
 	extractKeysStr, _ := step.Params["extractKeys"].(string)
@@ -58,7 +57,7 @@ func (we *WorkflowExecutor) executeJSONLReaderWithDepth(step ExecutionStep, task
 		}
 	}
 
-	log.Printf("[Workflow] JSONL读取器: 文件=%s, 字段=%v, 变量=%s, 间隔=%dms, 最大次数=%d", filePath, extractKeys, saveToVariable, loopInterval, maxCount)
+	AppLog.Info(fmt.Sprintf("[Workflow] JSONL读取器: 文件=%s, 字段=%v, 变量=%s, 间隔=%dms, 最大次数=%d", filePath, extractKeys, saveToVariable, loopInterval, maxCount))
 
 	// 创建JSONL读取器
 	reader := NewJSONLReader(filePath)
@@ -67,7 +66,7 @@ func (we *WorkflowExecutor) executeJSONLReaderWithDepth(step ExecutionStep, task
 	}
 
 	lineCount := reader.GetLineCount()
-	log.Printf("[Workflow] JSONL文件加载成功，共 %d 行", lineCount)
+	AppLog.Info(fmt.Sprintf("[Workflow] JSONL文件加载成功，共 %d 行", lineCount))
 
 	if lineCount == 0 {
 		return fmt.Errorf("JSONL文件为空")
@@ -78,7 +77,7 @@ func (we *WorkflowExecutor) executeJSONLReaderWithDepth(step ExecutionStep, task
 	if maxCount > 0 && maxCount < lineCount {
 		actualLoops = maxCount
 	}
-	log.Printf("[Workflow] 将处理 %d 行数据", actualLoops)
+	AppLog.Info(fmt.Sprintf("[Workflow] 将处理 %d 行数据", actualLoops))
 
 	// 查找JSONL节点的下一个节点（循环体的起始节点）
 	nextNodeID := we.findNextNode(task, step.NodeID, "")
@@ -93,11 +92,11 @@ func (we *WorkflowExecutor) executeJSONLReaderWithDepth(step ExecutionStep, task
 			return fmt.Errorf("执行已停止")
 		}
 
-		log.Printf("[Workflow] ========== 处理第 %d/%d 行 ==========", i+1, lineCount)
+		LogDebug(fmt.Sprintf("[JSONL] ========== 处理第 %d/%d 行 ==========", i+1, lineCount))
 
 		// 每次循环前等待，确保页面和扩展状态稳定
 		if i > 0 { // 第一次不需要等待
-			log.Printf("[JSONL读取器] 等待页面稳定...")
+			AppLog.Info(fmt.Sprintf("[JSONL读取器] 等待页面稳定..."))
 			time.Sleep(3 * time.Second)
 		}
 
@@ -112,17 +111,17 @@ func (we *WorkflowExecutor) executeJSONLReaderWithDepth(step ExecutionStep, task
 
 		// 保存到变量
 		we.variables[saveToVariable] = extractedData
-		log.Printf("[JSONL读取器] ✓ 变量已保存: %s = %v", saveToVariable, extractedData)
-		
-		log.Printf("[JSONL读取器] ========== 保存后的所有变量 ==========")
+		AppLog.Info(fmt.Sprintf("[JSONL读取器] ✓ 变量已保存: %s = %v", saveToVariable, extractedData))
+
+		AppLog.Info(fmt.Sprintf("[JSONL读取器] ========== 保存后的所有变量 =========="))
 		for key, value := range we.variables {
-			log.Printf("[JSONL读取器] 变量: %s (%T) = %v", key, value, value)
+			LogDebug(fmt.Sprintf("[Workflow] 变量: %s (%T) = %v", key, value, value))
 		}
-		log.Printf("[JSONL读取器] =====================================")
+		AppLog.Info(fmt.Sprintf("[JSONL读取器] ====================================="))
 
 		// 执行循环体（从下一个节点开始，直到结束节点）
-		log.Printf("[JSONL读取器] 准备执行循环体...")
-		
+		AppLog.Info(fmt.Sprintf("[JSONL读取器] 准备执行循环体..."))
+
 		// 临时使用原始的executeLoopBody，不使用多层循环
 		if err := we.executeLoopBody(task, nextNodeID, stepCount); err != nil {
 			return fmt.Errorf("执行第 %d 行时失败: %w", i+1, err)
@@ -134,7 +133,7 @@ func (we *WorkflowExecutor) executeJSONLReaderWithDepth(step ExecutionStep, task
 		}
 	}
 
-	log.Printf("[Workflow] JSONL读取器执行完成，共处理 %d 行", actualLoops)
+	AppLog.Info(fmt.Sprintf("[Workflow] JSONL读取器执行完成，共处理 %d 行", actualLoops))
 	return nil
 }
 
@@ -167,7 +166,7 @@ func (we *WorkflowExecutor) executeLoopBodyWithDepth(task WorkflowTask, startNod
 
 		// 如果是结束节点，退出
 		if node.Type == "end" {
-			log.Printf("[Workflow] 循环体到达结束节点")
+			AppLog.Info(fmt.Sprintf("[Workflow] 循环体到达结束节点"))
 			break
 		}
 
@@ -177,7 +176,7 @@ func (we *WorkflowExecutor) executeLoopBodyWithDepth(task WorkflowTask, startNod
 		}
 
 		stepCount++
-		log.Printf("[Workflow] 循环体步骤 %d (深度:%d): %s", stepCount, depth, node.Type)
+		AppLog.Info(fmt.Sprintf("[Workflow] 循环体步骤 %d (深度:%d): %s", stepCount, depth, node.Type))
 
 		we.emitStatus(ExecutionStatus{
 			TaskID:      task.ID,
@@ -200,7 +199,7 @@ func (we *WorkflowExecutor) executeLoopBodyWithDepth(task WorkflowTask, startNod
 			}
 			we.replaceVariables(&step)
 
-			log.Printf("[Workflow] 执行嵌套for循环 (深度:%d)", depth+1)
+			AppLog.Info(fmt.Sprintf("[Workflow] 执行嵌套for循环 (深度:%d)", depth+1))
 			err := we.executeForWithDepth(step, task, stepCount, depth+1)
 			if err != nil {
 				return fmt.Errorf("嵌套for循环执行失败: %w", err)
@@ -224,7 +223,7 @@ func (we *WorkflowExecutor) executeLoopBodyWithDepth(task WorkflowTask, startNod
 			}
 			we.replaceVariables(&step)
 
-			log.Printf("[Workflow] 执行嵌套JSONL读取器 (深度:%d)", depth+1)
+			AppLog.Info(fmt.Sprintf("[Workflow] 执行嵌套JSONL读取器 (深度:%d)", depth+1))
 			err := we.executeJSONLReaderWithDepth(step, task, stepCount, depth+1)
 			if err != nil {
 				return fmt.Errorf("嵌套JSONL读取器执行失败: %w", err)
@@ -268,11 +267,11 @@ func (we *WorkflowExecutor) executeLoopBodyWithDepth(task WorkflowTask, startNod
 		}
 		we.replaceVariables(&step)
 
-		log.Printf("[循环体执行器] ========== 当前变量状态 ==========")
+		LogDebug(fmt.Sprintf("[Workflow] ========== 当前变量状态 =========="))
 		for key, value := range we.variables {
-			log.Printf("[循环体执行器] 变量: %s (%T) = %v", key, value, value)
+			LogDebug(fmt.Sprintf("[Workflow] 变量: %s (%T) = %v", key, value, value))
 		}
-		log.Printf("[循环体执行器] =====================================")
+		AppLog.Info(fmt.Sprintf("[循环体执行器] ====================================="))
 
 		// 获取节点的自定义标签或类型作为显示名称
 		nodeDisplayName := node.Type
@@ -280,12 +279,14 @@ func (we *WorkflowExecutor) executeLoopBodyWithDepth(task WorkflowTask, startNod
 			nodeDisplayName = fmt.Sprintf("%s(%s)", customLabel, node.Type)
 		}
 
-		log.Printf("[循环体执行器] 准备执行节点: [%s] ID=%s, 参数=%+v", nodeDisplayName, currentNodeID, step.Params)
-		
+		AppLog.Info(fmt.Sprintf("[循环体执行器] 准备执行节点: [%s] ID=%s, 参数=%+v", nodeDisplayName, currentNodeID, step.Params))
+
 		result, err := we.executeStep(step)
 		if err != nil {
-			log.Printf("[循环体执行器] ❌ 节点执行失败: [%s] ID=%s, 错误=%v", nodeDisplayName, currentNodeID, err)
-			return fmt.Errorf("步骤执行失败: %w", err)
+			errMsg := fmt.Sprintf("[循环体执行器] ❌ 节点执行失败: [%s] (ID: %s, 类型: %s) - %v",
+				nodeDisplayName, currentNodeID, node.Type, err)
+			LogError(errMsg)
+			return fmt.Errorf("节点执行失败: %s", errMsg)
 		}
 
 		// 安全访问result.Message
@@ -293,7 +294,7 @@ func (we *WorkflowExecutor) executeLoopBodyWithDepth(task WorkflowTask, startNod
 		if result.Message != "" {
 			message = result.Message
 		}
-		log.Printf("[循环体执行器] ✅ 节点执行成功: [%s] %v", nodeDisplayName, message)
+		AppLog.Info(fmt.Sprintf("[循环体执行器] ✅ 节点执行成功: [%s] %v", nodeDisplayName, message))
 
 		// 查找下一个节点
 		currentNodeID = we.findNextNode(task, currentNodeID, "")

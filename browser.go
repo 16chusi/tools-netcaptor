@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -76,7 +75,7 @@ func (bm *BrowserManager) Init() error {
 	// 注入反检测脚本
 	err = bm.injectAntiDetectionScript()
 	if err != nil {
-		log.Printf("注入反检测脚本失败: %v", err)
+		AppLog.Info(fmt.Sprintf("注入反检测脚本失败: %v", err))
 	}
 
 	return nil

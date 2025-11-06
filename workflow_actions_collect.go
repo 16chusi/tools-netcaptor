@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 )
 
@@ -53,7 +52,7 @@ func (we *WorkflowExecutor) executeCollect(step ExecutionStep) (ExecutionResult,
 		return ExecutionResult{Success: false}, fmt.Errorf("写入文件失败: %w", err)
 	}
 
-	log.Printf("[Workflow] ✓ 数据已追加到文件: %s", filePath)
+	AppLog.Info(fmt.Sprintf("[Workflow] ✓ 数据已追加到文件: %s", filePath))
 
 	return ExecutionResult{
 		Success: true,

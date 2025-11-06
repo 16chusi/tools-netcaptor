@@ -23,7 +23,7 @@ type ProxyServer struct {
 func NewProxyServer(port int, capture *NetworkCapture) *ProxyServer {
 	certManager, err := NewCertManager()
 	if err != nil {
-		fmt.Printf("证书管理器初始化失败: %v\n", err)
+		AppLog.Info(fmt.Sprintf("证书管理器初始化失败: %v\n", err))
 	}
 	return &ProxyServer{
 		port:        port,

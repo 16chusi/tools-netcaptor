@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -54,7 +53,7 @@ func (ws *WebhookServer) Start() error {
 	ws.running = true
 	ws.mu.Unlock()
 
-	log.Printf("[Webhook] 服务器启动在 http://127.0.0.1:%d", ws.port)
+	AppLog.Info(fmt.Sprintf("[Webhook] 服务器启动在 http://127.0.0.1:%d", ws.port))
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", ws.handleTestPage)
@@ -64,7 +63,7 @@ func (ws *WebhookServer) Start() error {
 
 	go func() {
 		if err := http.Serve(listener, mux); err != nil {
-			log.Printf("[Webhook] 服务器错误: %v", err)
+			AppLog.Info(fmt.Sprintf("[Webhook] 服务器错误: %v", err))
 		}
 	}()
 
@@ -85,7 +84,7 @@ func (ws *WebhookServer) Stop() error {
 	}
 
 	ws.running = false
-	log.Printf("[Webhook] 服务器已停止")
+	AppLog.Info(fmt.Sprintf("[Webhook] 服务器已停止"))
 	return nil
 }
 
@@ -244,7 +243,7 @@ func (ws *WebhookServer) handleSave(req WebhookRequest) (string, error) {
 		return "", fmt.Errorf("写入换行符失败: %w", err)
 	}
 
-	log.Printf("[Webhook] 追加文件: %s (%d bytes)", filename, len(data))
+	AppLog.Info(fmt.Sprintf("[Webhook] 追加文件: %s (%d bytes)", filename, len(data)))
 	return fmt.Sprintf("文件已追加: %s", filename), nil
 }
 
@@ -255,7 +254,7 @@ func (ws *WebhookServer) handlePrint(req WebhookRequest) (string, error) {
 		return "", fmt.Errorf("解码数据失败: %w", err)
 	}
 
-	log.Printf("[Webhook] 打印数据 (%d bytes):\n%s", len(data), string(data))
+	AppLog.Info(fmt.Sprintf("[Webhook] 打印数据 (%d bytes):\n%s", len(data), string(data)))
 	return "数据已打印到控制台", nil
 }
 

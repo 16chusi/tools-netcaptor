@@ -55,14 +55,14 @@ func NewGoProxyServer(port int, capture *NetworkCapture) *GoProxyServer {
 			host = req.URL.Host
 		}
 
-		fmt.Printf("[GoProxy Request] 💓 收到请求: %s %s (Host: %s)\n", req.Method, req.URL.String(), host)
+		LogDebug(fmt.Sprintf("[GoProxy Request] 收到请求: %s %s (Host: %s)\n", req.Method, req.URL.String(), host))
 
 		// 调试智能代理状态
-		fmt.Printf("[GoProxy Request] 🔍 本地智能代理管理器状态: %v\n", gps.smartProxy != nil)
-		fmt.Printf("[GoProxy Request] 🔍 NetworkApp状态: %v\n", gps.networkApp != nil)
+		AppLog.Info(fmt.Sprintf("[GoProxy Request] 🔍 本地智能代理管理器状态: %v\n", gps.smartProxy != nil))
+		AppLog.Info(fmt.Sprintf("[GoProxy Request] 🔍 NetworkApp状态: %v\n", gps.networkApp != nil))
 		if gps.networkApp != nil {
-			fmt.Printf("[GoProxy Request] 🔍 NetworkApp.smartProxyMgr状态: %v\n", gps.networkApp.smartProxyMgr != nil)
-			fmt.Printf("[GoProxy Request] 🔍 NetworkApp.proxyConfigMgr状态: %v\n", gps.networkApp.proxyConfigMgr != nil)
+			AppLog.Info(fmt.Sprintf("[GoProxy Request] 🔍 NetworkApp.smartProxyMgr状态: %v\n", gps.networkApp.smartProxyMgr != nil))
+			AppLog.Info(fmt.Sprintf("[GoProxy Request] 🔍 NetworkApp.proxyConfigMgr状态: %v\n", gps.networkApp.proxyConfigMgr != nil))
 		}
 
 		// 临时创建智能代理管理器进行测试
@@ -71,40 +71,40 @@ func NewGoProxyServer(port int, capture *NetworkCapture) *GoProxyServer {
 			tempSmartProxy := NewSmartProxyManager(gps.networkApp.proxyConfigMgr)
 
 			routeType := tempSmartProxy.DecideRoute(host)
-			fmt.Printf("[GoProxy Request] 🧪 临时智能路由决策: %s -> %s\n", host, routeType)
+			AppLog.Info(fmt.Sprintf("[GoProxy Request] 🧪 临时智能路由决策: %s -> %s\n", host, routeType))
 
 			// 打印所有规则
 			rules := tempSmartProxy.GetRules()
-			fmt.Printf("[GoProxy Request] 📋 当前规则数量: %d\n", len(rules))
+			AppLog.Info(fmt.Sprintf("[GoProxy Request] 📋 当前规则数量: %d\n", len(rules)))
 			for i, rule := range rules {
-				fmt.Printf("[GoProxy Request] 📋 规则%d: %s -> %s (%s, enabled: %v)\n",
-					i, rule.Pattern, rule.RouteType, rule.Source, rule.Enabled)
+				LogDebug(fmt.Sprintf("[GoProxy Request] 规则%d: %s -> %s (%s, enabled: %v)\n",
+					i, rule.Pattern, rule.RouteType, rule.Source, rule.Enabled))
 			}
 
 			// 检查代理配置
 			config := gps.networkApp.proxyConfigMgr.GetConfig()
-			fmt.Printf("[GoProxy Request] ⚙️ 代理配置: enabled=%v, host=%s, port=%d\n",
-				config.Enabled, config.Host, config.Port)
+			LogDebug(fmt.Sprintf("[GoProxy Request] 代理配置: enabled=%v, host=%s, port=%d\n",
+				config.Enabled, config.Host, config.Port))
 
 			if routeType == "proxy" && config.Enabled {
 				proxyURL := fmt.Sprintf("http://%s:%d", config.Host, config.Port)
-				fmt.Printf("[GoProxy Request] ✅ 需要使用上游代理: %s\n", proxyURL)
+				AppLog.Info(fmt.Sprintf("[GoProxy Request] ✅ 需要使用上游代理: %s\n", proxyURL))
 
 				// 动态设置全局传输层的代理
 				parsedURL, err := url.Parse(proxyURL)
 				if err == nil {
 					gps.proxy.Tr.Proxy = http.ProxyURL(parsedURL)
-					fmt.Printf("[GoProxy Request] 🔄 全局代理设置成功\n")
+					AppLog.Info(fmt.Sprintf("[GoProxy Request] 🔄 全局代理设置成功\n"))
 				} else {
-					fmt.Printf("[GoProxy Request] ❌ 代理URL解析失败: %v\n", err)
+					AppLog.Info(fmt.Sprintf("[GoProxy Request] ❌ 代理URL解析失败: %v\n", err))
 				}
 			} else {
-				fmt.Printf("[GoProxy Request] ℹ️ 直连访问: %s (routeType=%s, proxyEnabled=%v)\n", host, routeType, config.Enabled)
+				AppLog.Info(fmt.Sprintf("[GoProxy Request] ℹ️ 直连访问: %s (routeType=%s, proxyEnabled=%v)\n", host, routeType, config.Enabled))
 				// 设置为直连
 				gps.proxy.Tr.Proxy = nil
 			}
 		} else {
-			fmt.Printf("[GoProxy Request] ❌ 无法创建临时智能代理管理器\n")
+			AppLog.Info(fmt.Sprintf("[GoProxy Request] ❌ 无法创建临时智能代理管理器\n"))
 		}
 
 		gps.recordRequest(req)
@@ -113,11 +113,11 @@ func NewGoProxyServer(port int, capture *NetworkCapture) *GoProxyServer {
 
 	// 拦截CONNECT请求（HTTPS）
 	proxy.OnRequest().HandleConnect(goproxy.FuncHttpsHandler(func(host string, ctx *goproxy.ProxyCtx) (*goproxy.ConnectAction, string) {
-		fmt.Printf("[GoProxy CONNECT] 🔒 HTTPS连接请求: %s\n", host)
+		AppLog.Info(fmt.Sprintf("[GoProxy CONNECT] 🔒 HTTPS连接请求: %s\n", host))
 
 		// 检查是否是Google相关域名
 		if strings.Contains(host, "google") {
-			fmt.Printf("[GoProxy CONNECT] 🎯 检测到Google域名: %s\n", host)
+			AppLog.Info(fmt.Sprintf("[GoProxy CONNECT] 🎯 检测到Google域名: %s\n", host))
 		}
 
 		return goproxy.OkConnect, host
@@ -138,8 +138,8 @@ func NewGoProxyServer(port int, capture *NetworkCapture) *GoProxyServer {
 
 // SetupSmartProxy 设置智能代理（必须在设置smartProxy字段后调用）
 func (gps *GoProxyServer) SetupSmartProxy() {
-	fmt.Printf("[GoProxy] 🔧 开始设置智能代理传输层\n")
-	fmt.Printf("[GoProxy] 🔍 smartProxy指针: %p\n", gps.smartProxy)
+	AppLog.Info(fmt.Sprintf("[GoProxy] 🔧 开始设置智能代理传输层\n"))
+	AppLog.Info(fmt.Sprintf("[GoProxy] 🔍 smartProxy指针: %p\n", gps.smartProxy))
 
 	// 设置自定义传输层来支持智能代理
 	gps.proxy.Tr = &http.Transport{
@@ -149,54 +149,54 @@ func (gps *GoProxyServer) SetupSmartProxy() {
 				host = req.URL.Host
 			}
 
-			fmt.Printf("[GoProxy Transport] 🚀 传输层被调用: %s (Host: %s)\n", req.URL.String(), host)
+			AppLog.Info(fmt.Sprintf("[GoProxy Transport] 🚀 传输层被调用: %s (Host: %s)\n", req.URL.String(), host))
 
 			if gps.smartProxy != nil {
 				routeType := gps.smartProxy.DecideRoute(host)
-				fmt.Printf("[GoProxy Transport] 智能路由决策: %s -> %s\n", host, routeType)
+				AppLog.Info(fmt.Sprintf("[GoProxy Transport] 智能路由决策: %s -> %s\n", host, routeType))
 
 				if routeType == "proxy" && gps.smartProxy.proxyConfigMgr != nil {
 					config := gps.smartProxy.proxyConfigMgr.GetConfig()
 					if config.Enabled {
 						proxyURL := fmt.Sprintf("http://%s:%d", config.Host, config.Port)
-						fmt.Printf("[GoProxy Transport] ✅ 使用代理转发: %s\n", proxyURL)
+						AppLog.Info(fmt.Sprintf("[GoProxy Transport] ✅ 使用代理转发: %s\n", proxyURL))
 
 						parsedURL, err := url.Parse(proxyURL)
 						if err != nil {
-							fmt.Printf("[GoProxy Transport] ❌ 代理URL解析失败: %v\n", err)
+							AppLog.Info(fmt.Sprintf("[GoProxy Transport] ❌ 代理URL解析失败: %v\n", err))
 							return nil, err
 						}
 						return parsedURL, nil
 					} else {
-						fmt.Printf("[GoProxy Transport] ⚠️ 代理未启用，使用直连\n")
+						AppLog.Info(fmt.Sprintf("[GoProxy Transport] ⚠️ 代理未启用，使用直连\n"))
 					}
 				} else {
-					fmt.Printf("[GoProxy Transport] ℹ️ 直连访问: %s\n", host)
+					AppLog.Info(fmt.Sprintf("[GoProxy Transport] ℹ️ 直连访问: %s\n", host))
 				}
 			} else {
-				fmt.Printf("[GoProxy Transport] ⚠️ 智能代理管理器未初始化\n")
+				AppLog.Info(fmt.Sprintf("[GoProxy Transport] ⚠️ 智能代理管理器未初始化\n"))
 			}
 
-			fmt.Printf("[GoProxy Transport] 🔄 使用直连\n")
+			AppLog.Info(fmt.Sprintf("[GoProxy Transport] 🔄 使用直连\n"))
 			return nil, nil // 直连
 		},
 	}
 
-	fmt.Printf("[GoProxy] ✅ 智能代理传输层设置完成\n")
+	AppLog.Info(fmt.Sprintf("[GoProxy] ✅ 智能代理传输层设置完成\n"))
 }
 
 func (gps *GoProxyServer) Start() error {
 	gps.running = true
-	fmt.Printf("[GoProxy] 🚀 代理服务器启动中，端口: %d\n", gps.port)
+	AppLog.Info(fmt.Sprintf("[GoProxy] 🚀 代理服务器启动中，端口: %d\n", gps.port))
 	go func() {
 		addr := fmt.Sprintf(":%d", gps.port)
-		fmt.Printf("[GoProxy] 📡 代理服务器监听地址: %s\n", addr)
+		AppLog.Info(fmt.Sprintf("[GoProxy] 📡 代理服务器监听地址: %s\n", addr))
 		err := http.ListenAndServe(addr, gps.proxy)
 		if err != nil {
-			fmt.Printf("[GoProxy] ❌ 代理服务器启动失败: %v\n", err)
+			AppLog.Info(fmt.Sprintf("[GoProxy] ❌ 代理服务器启动失败: %v\n", err))
 		}
 	}()
-	fmt.Printf("[GoProxy] ✅ 代理服务器已启动: http://127.0.0.1:%d\n", gps.port)
+	AppLog.Info(fmt.Sprintf("[GoProxy] ✅ 代理服务器已启动: http://127.0.0.1:%d\n", gps.port))
 	return nil
 }
 

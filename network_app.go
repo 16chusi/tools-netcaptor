@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -53,7 +52,7 @@ func NewNetworkApp() *NetworkApp {
 	// 初始化存储
 	storage, err := NewWorkflowStorage()
 	if err != nil {
-		log.Printf("[App] 初始化存储失败: %v", err)
+		AppLog.Info(fmt.Sprintf("[App] 初始化存储失败: %v", err))
 	} else {
 		app.workflowStorage = storage
 	}
@@ -65,6 +64,14 @@ func (na *NetworkApp) startup(ctx context.Context) {
 	na.ctx = ctx
 	na.capture.ctx = ctx
 	na.webview.SetContext(ctx)
+
+	// 加载AI模型配置
+	if na.workflowStorage != nil && na.workflowExecutor != nil && na.workflowExecutor.aiService != nil {
+		if models, err := na.workflowStorage.LoadAIModels(); err == nil && len(models) > 0 {
+			na.workflowExecutor.aiService.UpdateModels(models)
+			AppLog.Info(fmt.Sprintf("[App] 已加载 %d 个AI模型配置", len(models)))
+		}
+	}
 }
 
 // 获取注入脚本
@@ -104,7 +111,7 @@ func (na *NetworkApp) ClearCapture() {
 
 // 启动代理服务器
 func (na *NetworkApp) StartProxy() error {
-	log.Printf("[NetworkApp] 启动代理服务器，当前规则数量: %d", len(na.proxy.interceptor.GetRules()))
+	AppLog.Info(fmt.Sprintf("[NetworkApp] 启动代理服务器，当前规则数量: %d", len(na.proxy.interceptor.GetRules())))
 	return na.proxy.Start()
 }
 
@@ -121,7 +128,7 @@ func (na *NetworkApp) StartProxyWithPort(port int) error {
 
 	// 恢复规则
 	if len(oldRules) > 0 {
-		log.Printf("[NetworkApp] 恢复 %d 条拦截规则", len(oldRules))
+		AppLog.Info(fmt.Sprintf("[NetworkApp] 恢复 %d 条拦截规则", len(oldRules)))
 		na.proxy.interceptor.SetRules(oldRules)
 	}
 	return na.proxy.Start()
@@ -188,10 +195,10 @@ func (na *NetworkApp) ExportData(entriesJSON string) error {
 // 在Chrome中打开URL
 func (na *NetworkApp) OpenInChrome(url string) error {
 	proxyURL := na.proxy.GetProxyURL()
-	fmt.Printf("[NetworkApp] 🚀 启动Chrome浏览器\n")
-	fmt.Printf("[NetworkApp] 📍 目标URL: %s\n", url)
-	fmt.Printf("[NetworkApp] 🔗 中间人代理URL: %s\n", proxyURL)
-	fmt.Printf("[NetworkApp] 📊 代理服务器运行状态: %v\n", na.proxy.IsRunning())
+	AppLog.Info(fmt.Sprintf("[NetworkApp] 🚀 启动Chrome浏览器\n"))
+	AppLog.Info(fmt.Sprintf("[NetworkApp] 📍 目标URL: %s\n", url))
+	AppLog.Info(fmt.Sprintf("[NetworkApp] 🔗 中间人代理URL: %s\n", proxyURL))
+	AppLog.Info(fmt.Sprintf("[NetworkApp] 📊 代理服务器运行状态: %v\n", na.proxy.IsRunning()))
 	return OpenInChrome(url, proxyURL)
 }
 
@@ -266,9 +273,9 @@ func (na *NetworkApp) GetInterceptRules() []InterceptRule {
 
 // 设置拦截规则
 func (na *NetworkApp) SetInterceptRules(rules []InterceptRule) error {
-	log.Printf("[NetworkApp] 设置拦截规则，数量: %d", len(rules))
+	AppLog.Info(fmt.Sprintf("[NetworkApp] 设置拦截规则，数量: %d", len(rules)))
 	for i, rule := range rules {
-		log.Printf("[NetworkApp] 规则 %d: Name=%s, Pattern=%s, Enabled=%v, ActionType=%s", i, rule.Name, rule.URLPattern, rule.Enabled, rule.ActionType)
+		AppLog.Info(fmt.Sprintf("[NetworkApp] 规则 %d: Name=%s, Pattern=%s, Enabled=%v, ActionType=%s", i, rule.Name, rule.URLPattern, rule.Enabled, rule.ActionType))
 	}
 	return na.proxy.interceptor.SetRules(rules)
 }
@@ -443,12 +450,24 @@ func (app *NetworkApp) UpdateAIModels(models []AIModel) error {
 	if app.workflowExecutor != nil && app.workflowExecutor.aiService != nil {
 		app.workflowExecutor.aiService.UpdateModels(models)
 	}
+	// 保存到数据库
+	if app.workflowStorage != nil {
+		return app.workflowStorage.SaveAIModels(models)
+	}
 	return nil
+}
+
+// GetAIModels 获取AI模型配置
+func (app *NetworkApp) GetAIModels() []AIModel {
+	if app.workflowExecutor != nil && app.workflowExecutor.aiService != nil {
+		return app.workflowExecutor.aiService.GetModels()
+	}
+	return []AIModel{}
 }
 
 // TestAIModel 测试AI模型连接
 func (app *NetworkApp) TestAIModel(model AIModel) error {
-	fmt.Printf("[AI测试] 开始测试模型: %s, 供应商: %s\n", model.Name, model.Provider)
+	AppLog.Info(fmt.Sprintf("[AI测试] 开始测试模型: %s, 供应商: %s\n", model.Name, model.Provider))
 
 	// 创建临时AIService进行测试
 	aiService := NewAIService(app.proxyConfigMgr, app.smartProxyMgr)
@@ -456,9 +475,9 @@ func (app *NetworkApp) TestAIModel(model AIModel) error {
 
 	err := aiService.TestModel(model)
 	if err != nil {
-		fmt.Printf("[AI测试] 测试失败: %v\n", err)
+		AppLog.Info(fmt.Sprintf("[AI测试] 测试失败: %v\n", err))
 	} else {
-		fmt.Printf("[AI测试] 测试成功\n")
+		AppLog.Info(fmt.Sprintf("[AI测试] 测试成功\n"))
 	}
 
 	return err

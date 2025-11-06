@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"time"
 )
 
@@ -63,8 +62,8 @@ func (we *WorkflowExecutor) executeNavigate(step ExecutionStep) (ExecutionResult
 		return ExecutionResult{Success: false}, fmt.Errorf("缺少 URL 参数")
 	}
 
-	log.Printf("[Workflow] 导航到: %s", url)
-	log.Printf("[Workflow] 当前变量: %+v", we.variables)
+	AppLog.Info(fmt.Sprintf("[Workflow] 导航到: %s", url))
+	AppLog.Info(fmt.Sprintf("[Workflow] 当前变量: %+v", we.variables))
 
 	openMode := "current"
 	if mode, ok := step.Params["openMode"].(string); ok && mode != "" {
@@ -84,10 +83,10 @@ func (we *WorkflowExecutor) executeNavigate(step ExecutionStep) (ExecutionResult
 
 // executeClick 执行点击
 func (we *WorkflowExecutor) executeClick(step ExecutionStep) (ExecutionResult, error) {
-	log.Printf("[点击元素节点] 开始执行")
+	LogDebug(fmt.Sprintf("[Action] 开始执行"))
 	selector, ok := step.Params["selector"].(string)
 	if !ok || selector == "" {
-		log.Printf("[点击元素节点] 错误: 缺少 selector 参数")
+		AppLog.Info(fmt.Sprintf("[点击元素节点] 错误: 缺少 selector 参数"))
 		return ExecutionResult{Success: false}, fmt.Errorf("缺少 selector 参数")
 	}
 
@@ -96,7 +95,7 @@ func (we *WorkflowExecutor) executeClick(step ExecutionStep) (ExecutionResult, e
 		selectorType = st
 	}
 
-	log.Printf("[点击元素节点] 执行参数: selector=%s, selectorType=%s", selector, selectorType)
+	LogDebug(fmt.Sprintf("[Action] 执行参数: selector=%s, selectorType=%s", selector, selectorType))
 
 	msg := WSMessage{
 		Type: "click_element",
@@ -108,38 +107,38 @@ func (we *WorkflowExecutor) executeClick(step ExecutionStep) (ExecutionResult, e
 
 	result, err := we.sendAndWait(msg, 30*time.Second, "click_element")
 	if err != nil {
-		log.Printf("[点击元素节点] 执行失败: %v", err)
+		AppLog.Info(fmt.Sprintf("[点击元素节点] 执行失败: %v", err))
 	} else {
-		log.Printf("[点击元素节点] 执行成功")
+		AppLog.Info(fmt.Sprintf("[点击元素节点] 执行成功"))
 	}
 	return result, err
 }
 
 // executeInput 执行输入
 func (we *WorkflowExecutor) executeInput(step ExecutionStep) (ExecutionResult, error) {
-	log.Printf("[输入文本节点] 开始执行")
-	log.Printf("[输入文本节点] 参数: %+v", step.Params)
+	LogDebug(fmt.Sprintf("[Action] 开始执行"))
+	LogDebug(fmt.Sprintf("[Action] 参数: %+v", step.Params))
 
 	// 检查WebSocket连接状态
 	if !we.wsServer.IsRunning() {
-		log.Printf("[输入文本节点] WebSocket服务器未运行")
+		AppLog.Info(fmt.Sprintf("[输入文本节点] WebSocket服务器未运行"))
 		return ExecutionResult{Success: false}, fmt.Errorf("WebSocket服务器未运行")
 	}
 	if !we.wsServer.HasClients() {
-		log.Printf("[输入文本节点] 没有浏览器扩展连接")
+		AppLog.Info(fmt.Sprintf("[输入文本节点] 没有浏览器扩展连接"))
 		return ExecutionResult{Success: false}, fmt.Errorf("没有浏览器扩展连接")
 	}
-	log.Printf("[输入文本节点] WebSocket连接正常")
+	AppLog.Info(fmt.Sprintf("[输入文本节点] WebSocket连接正常"))
 
 	selector, ok := step.Params["selector"].(string)
 	if !ok || selector == "" {
-		log.Printf("[输入文本节点] 错误: 缺少 selector 参数")
+		AppLog.Info(fmt.Sprintf("[输入文本节点] 错误: 缺少 selector 参数"))
 		return ExecutionResult{Success: false}, fmt.Errorf("缺少 selector 参数")
 	}
 
 	text, ok := step.Params["text"].(string)
 	if !ok {
-		log.Printf("[输入文本节点] 错误: 缺少 text 参数")
+		AppLog.Info(fmt.Sprintf("[输入文本节点] 错误: 缺少 text 参数"))
 		return ExecutionResult{Success: false}, fmt.Errorf("缺少 text 参数")
 	}
 
@@ -148,7 +147,7 @@ func (we *WorkflowExecutor) executeInput(step ExecutionStep) (ExecutionResult, e
 		selectorType = st
 	}
 
-	log.Printf("[输入文本节点] 执行参数: selector=%s, text=%s, selectorType=%s", selector, text, selectorType)
+	LogDebug(fmt.Sprintf("[Action] 执行参数: selector=%s, text=%s, selectorType=%s", selector, text, selectorType))
 
 	msg := WSMessage{
 		Type: "input_text",
@@ -159,12 +158,12 @@ func (we *WorkflowExecutor) executeInput(step ExecutionStep) (ExecutionResult, e
 		},
 	}
 
-	log.Printf("[输入文本节点] 发送WebSocket消息")
+	AppLog.Info(fmt.Sprintf("[输入文本节点] 发送WebSocket消息"))
 	result, err := we.sendAndWait(msg, 30*time.Second, "input_text")
 	if err != nil {
-		log.Printf("[输入文本节点] 执行失败: %v", err)
+		AppLog.Info(fmt.Sprintf("[输入文本节点] 执行失败: %v", err))
 	} else {
-		log.Printf("[输入文本节点] 执行成功")
+		AppLog.Info(fmt.Sprintf("[输入文本节点] 执行成功"))
 	}
 
 	return result, err
@@ -187,10 +186,10 @@ func (we *WorkflowExecutor) executeWait(step ExecutionStep) (ExecutionResult, er
 
 // executeExtract 执行网页内容获取
 func (we *WorkflowExecutor) executeExtract(step ExecutionStep) (ExecutionResult, error) {
-	log.Printf("[获取网页内容节点] 开始执行")
+	LogDebug(fmt.Sprintf("[Action] 开始执行"))
 	selector, _ := step.Params["selector"].(string)
 	if selector == "" {
-		log.Printf("[获取网页内容节点] 错误: 缺少 selector 参数")
+		AppLog.Info(fmt.Sprintf("[获取网页内容节点] 错误: 缺少 selector 参数"))
 		return ExecutionResult{Success: false}, fmt.Errorf("缺少 selector 参数")
 	}
 
@@ -204,7 +203,7 @@ func (we *WorkflowExecutor) executeExtract(step ExecutionStep) (ExecutionResult,
 		attribute = attr
 	}
 
-	log.Printf("[获取网页内容节点] 执行参数: selector=%s, selectorType=%s, attribute=%s", selector, selectorType, attribute)
+	LogDebug(fmt.Sprintf("[Action] 执行参数: selector=%s, selectorType=%s, attribute=%s", selector, selectorType, attribute))
 
 	msg := WSMessage{
 		Type: "extract_data",
@@ -215,40 +214,42 @@ func (we *WorkflowExecutor) executeExtract(step ExecutionStep) (ExecutionResult,
 		},
 	}
 
-	log.Printf("[获取网页内容节点] 发送WebSocket消息到浏览器扩展: %+v", msg)
-	log.Printf("[获取网页内容节点] 等待浏览器扩展响应...")
+	AppLog.Info(fmt.Sprintf("[获取网页内容节点] 发送WebSocket消息到浏览器扩展: %+v", msg))
+	AppLog.Info(fmt.Sprintf("[获取网页内容节点] 等待浏览器扩展响应..."))
 
 	result, err := we.sendAndWait(msg, 30*time.Second, "extract")
 
 	if err == nil && result.Success {
-		log.Printf("[获取网页内容节点] 收到成功响应: %+v", result.Data)
+		AppLog.Info(fmt.Sprintf("[获取网页内容节点] 收到成功响应: %+v", result.Data))
 		if saveToVariable, ok := step.Params["saveToVariable"].(string); ok && saveToVariable != "" {
 			if data, ok := result.Data["value"]; ok {
-				log.Printf("[获取网页内容节点] 准备保存数据到变量 %s: %v", saveToVariable, data)
+				// 去掉花括号
+				cleanSaveToVariable := saveToVariable
+				LogDebug(fmt.Sprintf("[获取网页内容节点] 准备保存数据到变量 %s (原始: %s): %v", cleanSaveToVariable, saveToVariable, data))
 
 				// 检查是否覆盖了现有变量
-				if oldValue, exists := we.variables[saveToVariable]; exists {
-					log.Printf("[获取网页内容节点] ⚠️ 覆盖现有变量 %s: 旧值=%v, 新值=%v", saveToVariable, oldValue, data)
+				if oldValue, exists := we.variables[cleanSaveToVariable]; exists {
+					LogDebug(fmt.Sprintf("[获取网页内容节点] ⚠️ 覆盖现有变量 %s: 旧值=%v, 新值=%v", cleanSaveToVariable, oldValue, data))
 				}
 
-				we.variables[saveToVariable] = data
-				log.Printf("[获取网页内容节点] ✓ 数据已保存到变量: %s = %v", saveToVariable, data)
+				we.variables[cleanSaveToVariable] = data
+				LogInfo(fmt.Sprintf("[获取网页内容节点] ✓ 数据已保存到变量: %s = %v", cleanSaveToVariable, data))
 
 				// 验证保存是否成功
-				if savedValue, exists := we.variables[saveToVariable]; exists {
-					log.Printf("[获取网页内容节点] ✓ 验证保存成功: %s = %v", saveToVariable, savedValue)
+				if savedValue, exists := we.variables[cleanSaveToVariable]; exists {
+					LogDebug(fmt.Sprintf("[获取网页内容节点] ✓ 验证保存成功: %s = %v", cleanSaveToVariable, savedValue))
 				} else {
-					log.Printf("[获取网页内容节点] ❌ 验证保存失败: 变量 %s 不存在", saveToVariable)
+					LogError(fmt.Sprintf("[获取网页内容节点] ❌ 验证保存失败: 变量 %s 不存在", cleanSaveToVariable))
 				}
 			} else {
-				log.Printf("[获取网页内容节点] ❌ 响应中没有 value 字段: %+v", result.Data)
+				AppLog.Info(fmt.Sprintf("[获取网页内容节点] ❌ 响应中没有 value 字段: %+v", result.Data))
 			}
 		} else {
-			log.Printf("[获取网页内容节点] 没有配置 saveToVariable 参数，不保存数据")
+			AppLog.Info(fmt.Sprintf("[获取网页内容节点] 没有配置 saveToVariable 参数，不保存数据"))
 		}
-		log.Printf("[获取网页内容节点] 执行成功")
+		AppLog.Info(fmt.Sprintf("[获取网页内容节点] 执行成功"))
 	} else {
-		log.Printf("[获取网页内容节点] 执行失败: %v", err)
+		AppLog.Info(fmt.Sprintf("[获取网页内容节点] 执行失败: %v", err))
 	}
 
 	return result, err

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
@@ -41,7 +40,7 @@ func NewWorkflowStorage() (*WorkflowStorage, error) {
 		return nil, err
 	}
 
-	log.Printf("[Storage] 数据库已初始化: %s", dbPath)
+	AppLog.Info(fmt.Sprintf("[Storage] 数据库已初始化: %s", dbPath))
 	return storage, nil
 }
 
@@ -55,6 +54,15 @@ func (s *WorkflowStorage) initTables() error {
 		updated_at TEXT NOT NULL,
 		nodes_json TEXT NOT NULL,
 		edges_json TEXT NOT NULL
+	);
+	
+	CREATE TABLE IF NOT EXISTS ai_models (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		provider TEXT NOT NULL,
+		name TEXT NOT NULL,
+		api_key TEXT NOT NULL,
+		base_url TEXT NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
 	`
 	_, err := s.db.Exec(schema)
@@ -84,7 +92,7 @@ func (s *WorkflowStorage) SaveTask(task WorkflowTask) error {
 		return fmt.Errorf("保存任务失败: %w", err)
 	}
 
-	log.Printf("[Storage] 任务已保存: %s (%s)", task.Name, task.ID)
+	AppLog.Info(fmt.Sprintf("[Storage] 任务已保存: %s (%s)", task.Name, task.ID))
 	return nil
 }
 
@@ -151,8 +159,64 @@ func (s *WorkflowStorage) DeleteTask(id string) error {
 	if err != nil {
 		return fmt.Errorf("删除任务失败: %w", err)
 	}
-	log.Printf("[Storage] 任务已删除: %s", id)
+	AppLog.Info(fmt.Sprintf("[Storage] 任务已删除: %s", id))
 	return nil
+}
+
+// SaveAIModels 保存AI模型配置
+func (s *WorkflowStorage) SaveAIModels(models []AIModel) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("开始事务失败: %w", err)
+	}
+	defer tx.Rollback()
+
+	// 清空现有配置
+	if _, err := tx.Exec("DELETE FROM ai_models"); err != nil {
+		return fmt.Errorf("清空AI模型失败: %w", err)
+	}
+
+	// 插入新配置
+	stmt, err := tx.Prepare("INSERT INTO ai_models (provider, name, api_key, base_url) VALUES (?, ?, ?, ?)")
+	if err != nil {
+		return fmt.Errorf("准备插入语句失败: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, model := range models {
+		if _, err := stmt.Exec(model.Provider, model.Name, model.APIKey, model.BaseURL); err != nil {
+			return fmt.Errorf("插入AI模型失败: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("提交事务失败: %w", err)
+	}
+
+	AppLog.Info(fmt.Sprintf("[Storage] 已保存 %d 个AI模型配置", len(models)))
+	return nil
+}
+
+// LoadAIModels 加载AI模型配置
+func (s *WorkflowStorage) LoadAIModels() ([]AIModel, error) {
+	query := `SELECT provider, name, api_key, base_url FROM ai_models ORDER BY id`
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("查询AI模型失败: %w", err)
+	}
+	defer rows.Close()
+
+	var models []AIModel
+	for rows.Next() {
+		var model AIModel
+		if err := rows.Scan(&model.Provider, &model.Name, &model.APIKey, &model.BaseURL); err != nil {
+			return nil, fmt.Errorf("扫描AI模型失败: %w", err)
+		}
+		models = append(models, model)
+	}
+
+	AppLog.Info(fmt.Sprintf("[Storage] 已加载 %d 个AI模型配置", len(models)))
+	return models, nil
 }
 
 func (s *WorkflowStorage) Close() error {
