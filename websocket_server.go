@@ -178,6 +178,13 @@ func (ws *WebSocketServer) handleMessage(conn *websocket.Conn, msg WSMessage) {
 			ws.app.workflowExecutor.HandleResponse(msg)
 		}
 
+	case "get_page_dom":
+		log.Printf("[WebSocket服务器] 收到get_page_dom消息")
+		// 转发给工作流执行器
+		if ws.app.workflowExecutor != nil {
+			ws.app.workflowExecutor.HandleResponse(msg)
+		}
+
 	default:
 		log.Printf("[WebSocket] 未知消息类型: %s", msg.Type)
 	}
@@ -191,10 +198,14 @@ func (ws *WebSocketServer) Broadcast(msg WSMessage) {
 	ws.mu.RLock()
 	defer ws.mu.RUnlock()
 
+	log.Printf("[WebSocket] 广播消息给 %d 个客户端: %s", len(ws.clients), msg.Type)
+
 	for client := range ws.clients {
 		err := client.WriteJSON(msg)
 		if err != nil {
-			log.Printf("[WebSocket] 广播失败: %v", err)
+			log.Printf("[WebSocket] ❌ 广播失败: %v", err)
+		} else {
+			log.Printf("[WebSocket] ✅ 消息已发送给客户端")
 		}
 	}
 }
@@ -211,4 +222,10 @@ func (ws *WebSocketServer) HasClients() bool {
 	ws.mu.RLock()
 	defer ws.mu.RUnlock()
 	return len(ws.clients) > 0
+}
+
+func (ws *WebSocketServer) GetClientCount() int {
+	ws.mu.RLock()
+	defer ws.mu.RUnlock()
+	return len(ws.clients)
 }

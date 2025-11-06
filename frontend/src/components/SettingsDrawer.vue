@@ -1,5 +1,5 @@
 <template>
-  <div v-if="visible" class="drawer-overlay" @click="$emit('close')">
+  <div v-if="visible" class="drawer-overlay">
     <div class="drawer" @click.stop>
       <div class="drawer-header">
         <h3>⚙️ 设置</h3>
@@ -86,6 +86,16 @@
           </div>
         </div>
         
+        <!-- 智能代理规则 -->
+        <div v-if="activeTab === 'smart-proxy'" class="tab-panel">
+          <SmartProxyTab />
+        </div>
+        
+        <!-- 网络代理设置 -->
+        <div v-if="activeTab === 'proxy'" class="tab-panel">
+          <ProxyTab />
+        </div>
+        
         <!-- AI模型设置 -->
         <div v-if="activeTab === 'ai'" class="tab-panel">
           <AIModelTab />
@@ -99,6 +109,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import AIModelTab from './tabs/AIModelTab.vue'
+import ProxyTab from './tabs/ProxyTab.vue'
+import SmartProxyTab from './tabs/SmartProxyTab.vue'
 import {GetMaxHistoryEntries, SetMaxHistoryEntries} from "../../wailsjs/go/main/NetworkApp";
 
 const props = defineProps<{
@@ -119,6 +131,8 @@ const maxHistoryEntries = ref(30)
 const activeTab = ref('basic')
 const tabs = [
   { key: 'basic', label: '⚙️ 基础设置' },
+  { key: 'proxy', label: '🌐 网络代理' },
+  { key: 'smart-proxy', label: '🧠 智能路由' },
   { key: 'ai', label: '🤖 AI模型' }
 ]
 

@@ -109,7 +109,7 @@ func (we *WorkflowExecutor) getPageTitle() string {
 		},
 	}
 
-	result, err := we.sendAndWait(msg, 5*time.Second, "get_page_info")
+	result, err := we.sendAndWait(msg, 15*time.Second, "get_page_info")
 	if err != nil || !result.Success {
 		return "unknown_title"
 	}
@@ -144,7 +144,7 @@ func (we *WorkflowExecutor) getCurrentURL() string {
 		},
 	}
 
-	result, err := we.sendAndWait(msg, 5*time.Second, "get_page_info")
+	result, err := we.sendAndWait(msg, 15*time.Second, "get_page_info")
 	if err != nil || !result.Success {
 		return "unknown_url"
 	}

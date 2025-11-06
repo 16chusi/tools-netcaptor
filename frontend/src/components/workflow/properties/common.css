@@ -122,3 +122,38 @@
   color: #722ed1;
   font-size: 14px;
 }
+
+/* 高级选项折叠面板 */
+.advanced-options {
+  margin-top: 15px;
+  border: 1px solid #e8e8e8;
+  border-radius: 4px;
+  padding: 0;
+}
+
+.advanced-options summary {
+  padding: 8px 12px;
+  background: #f8f9fa;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 4px 4px 0 0;
+  user-select: none;
+}
+
+.advanced-options summary:hover {
+  background: #e9ecef;
+}
+
+.advanced-options[open] summary {
+  border-bottom: 1px solid #e8e8e8;
+  border-radius: 4px 4px 0 0;
+}
+
+.advanced-options .form-item {
+  margin: 10px 12px;
+}
+
+.advanced-options .form-item:last-child {
+  margin-bottom: 12px;
+}

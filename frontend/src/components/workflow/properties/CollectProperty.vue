@@ -9,8 +9,8 @@
     <div class="form-item">
       <label>保存文件</label>
       <div class="form-row">
-        <input v-model="formData.filePath" placeholder="选择文件" readonly />
-        <button @click="selectFile" type="button">选择</button>
+        <input v-model="formData.filePath" placeholder="选择保存位置" readonly />
+        <button @click="selectFile" type="button">保存到</button>
       </div>
       <div class="variable-hint">数据将追加到此文件</div>
     </div>
@@ -25,12 +25,12 @@
 </template>
 
 <script setup lang="ts">
-import { SelectJSONLFile } from '../../../../wailsjs/go/main/NetworkApp'
+import { SelectSaveFilePath } from '../../../../wailsjs/go/main/NetworkApp'
 
 const props = defineProps<{ formData: any }>()
 
 const selectFile = async () => {
-  const file = await SelectJSONLFile()
+  const file = await SelectSaveFilePath('data.jsonl')
   if (file) props.formData.filePath = file
 }
 </script>

@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
+	"net/url"
 	"os"
+	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -18,15 +21,29 @@ type NetworkApp struct {
 	workflowExecutor *WorkflowExecutor
 	workflowStorage  *WorkflowStorage
 	webhookServer    *WebhookServer
+	proxyConfigMgr   *ProxyConfigManager
+	smartProxyMgr    *SmartProxyManager
 }
 
 func NewNetworkApp() *NetworkApp {
 	capture := NewNetworkCapture()
+	proxyConfigMgr := NewProxyConfigManager()
+	smartProxyMgr := NewSmartProxyManager(proxyConfigMgr)
+
 	app := &NetworkApp{
-		capture: capture,
-		proxy:   NewGoProxyServer(8888, capture),
-		webview: NewWebViewCapture(capture),
+		capture:        capture,
+		proxy:          NewGoProxyServer(8888, capture),
+		webview:        NewWebViewCapture(capture),
+		proxyConfigMgr: proxyConfigMgr,
+		smartProxyMgr:  smartProxyMgr,
 	}
+
+	// 设置GoProxy的智能代理管理器
+	app.proxy.smartProxy = smartProxyMgr
+	app.proxy.networkApp = app // 设置NetworkApp引用
+	// 设置智能代理传输层
+	app.proxy.SetupSmartProxy()
+
 	app.wsServer = NewWebSocketServer(app)
 	app.workflowExecutor = NewWorkflowExecutor(app)
 	app.webhookServer = NewWebhookServer()
@@ -94,6 +111,12 @@ func (na *NetworkApp) StartProxyWithPort(port int) error {
 	// 保存旧的规则
 	oldRules := na.proxy.interceptor.GetRules()
 	na.proxy = NewGoProxyServer(port, na.capture)
+
+	// 重新设置NetworkApp引用和智能代理管理器
+	na.proxy.smartProxy = na.smartProxyMgr
+	na.proxy.networkApp = na
+	na.proxy.SetupSmartProxy()
+
 	// 恢复规则
 	if len(oldRules) > 0 {
 		log.Printf("[NetworkApp] 恢复 %d 条拦截规则", len(oldRules))
@@ -135,6 +158,10 @@ func (na *NetworkApp) ExportData(entriesJSON string) error {
 // 在Chrome中打开URL
 func (na *NetworkApp) OpenInChrome(url string) error {
 	proxyURL := na.proxy.GetProxyURL()
+	fmt.Printf("[NetworkApp] 🚀 启动Chrome浏览器\n")
+	fmt.Printf("[NetworkApp] 📍 目标URL: %s\n", url)
+	fmt.Printf("[NetworkApp] 🔗 中间人代理URL: %s\n", proxyURL)
+	fmt.Printf("[NetworkApp] 📊 代理服务器运行状态: %v\n", na.proxy.IsRunning())
 	return OpenInChrome(url, proxyURL)
 }
 
@@ -392,18 +419,18 @@ func (app *NetworkApp) UpdateAIModels(models []AIModel) error {
 // TestAIModel 测试AI模型连接
 func (app *NetworkApp) TestAIModel(model AIModel) error {
 	fmt.Printf("[AI测试] 开始测试模型: %s, 供应商: %s\n", model.Name, model.Provider)
-	
+
 	// 创建临时AIService进行测试
-	aiService := NewAIService()
+	aiService := NewAIService(app.proxyConfigMgr, app.smartProxyMgr)
 	aiService.UpdateModels([]AIModel{model})
-	
+
 	err := aiService.TestModel(model)
 	if err != nil {
 		fmt.Printf("[AI测试] 测试失败: %v\n", err)
 	} else {
 		fmt.Printf("[AI测试] 测试成功\n")
 	}
-	
+
 	return err
 }
 
@@ -412,6 +439,104 @@ func (app *NetworkApp) CallAI(modelIndex int, prompt string, systemPrompt string
 	if app.workflowExecutor == nil || app.workflowExecutor.aiService == nil {
 		return "", fmt.Errorf("AI服务未初始化")
 	}
-	
+
 	return app.workflowExecutor.aiService.CallAI(modelIndex, prompt, systemPrompt)
+}
+
+// ===== 代理配置管理方法 =====
+
+// GetProxyConfig 获取代理配置
+func (app *NetworkApp) GetProxyConfig() *ProxyConfig {
+	return app.proxyConfigMgr.GetConfig()
+}
+
+// SetProxyConfig 设置代理配置
+func (app *NetworkApp) SetProxyConfig(config *ProxyConfig) error {
+	return app.proxyConfigMgr.SetConfig(config)
+}
+
+// TestProxyConnection 测试代理连接
+func (app *NetworkApp) TestProxyConnection() ProxyTestResult {
+	return app.proxyConfigMgr.TestConnection()
+}
+
+// TestProxyConnectionWithURL 使用指定URL测试代理连接
+func (app *NetworkApp) TestProxyConnectionWithURL(testURL string) ProxyTestResult {
+	return app.proxyConfigMgr.TestConnectionWithURL(testURL)
+}
+
+// CreateHTTPClient 创建支持代理的HTTP客户端
+func (app *NetworkApp) CreateHTTPClient(timeoutSeconds int) *http.Client {
+	timeout := time.Duration(timeoutSeconds) * time.Second
+	return app.proxyConfigMgr.CreateHTTPClient(timeout)
+}
+
+// ===== 智能代理管理方法 =====
+
+// GetSmartProxyRules 获取智能代理规则
+func (app *NetworkApp) GetSmartProxyRules() []*RouteRule {
+	return app.smartProxyMgr.GetRules()
+}
+
+// AddSmartProxyRule 添加智能代理规则
+func (app *NetworkApp) AddSmartProxyRule(pattern, routeType string) error {
+	return app.smartProxyMgr.AddManualRule(pattern, routeType)
+}
+
+// RemoveSmartProxyRule 删除智能代理规则
+func (app *NetworkApp) RemoveSmartProxyRule(id string) error {
+	return app.smartProxyMgr.RemoveRule(id)
+}
+
+// ClearAutoLearnedRules 清空自动学习的规则
+func (app *NetworkApp) ClearAutoLearnedRules() error {
+	return app.smartProxyMgr.ClearAutoLearnedRules()
+}
+
+// TestSmartProxyRouting 测试智能代理路由
+func (app *NetworkApp) TestSmartProxyRouting(testURL string) string {
+	if testURL == "" {
+		testURL = "https://www.google.com"
+	}
+
+	// 解析URL获取主机名
+	parsedURL, err := url.Parse(testURL)
+	if err != nil {
+		return fmt.Sprintf("URL解析失败: %v", err)
+	}
+
+	host := parsedURL.Host
+	if host == "" {
+		host = parsedURL.Path // 如果没有协议，可能整个URL在Path中
+	}
+
+	// 获取路由决策
+	routeType := app.smartProxyMgr.DecideRoute(host)
+
+	result := fmt.Sprintf("测试URL: %s\n主机: %s\n路由决策: %s\n", testURL, host, routeType)
+
+	// 检查代理配置
+	if app.proxyConfigMgr.GetConfig().Enabled {
+		config := app.proxyConfigMgr.GetConfig()
+		result += fmt.Sprintf("代理配置: %s:%d (类型: %s)\n", config.Host, config.Port, config.Type)
+
+		if routeType == "proxy" {
+			result += "✅ 将通过代理转发请求\n"
+		} else {
+			result += "⚠️ 将直连访问（不使用代理）\n"
+		}
+	} else {
+		result += "❌ 代理未启用\n"
+	}
+
+	// 显示匹配的规则
+	rules := app.smartProxyMgr.GetRules()
+	result += "\n当前智能代理规则:\n"
+	for _, rule := range rules {
+		if rule.Enabled {
+			result += fmt.Sprintf("- %s -> %s (%s)\n", rule.Pattern, rule.RouteType, rule.Source)
+		}
+	}
+
+	return result
 }

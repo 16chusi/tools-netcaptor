@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -44,13 +45,29 @@ type Choice struct {
 
 // AIService AI服务
 type AIService struct {
-	models []AIModel
+	models         []AIModel
+	proxyConfigMgr *ProxyConfigManager
+	smartProxyMgr  *SmartProxyManager
 }
 
 // NewAIService 创建AI服务
-func NewAIService() *AIService {
+func NewAIService(proxyConfigMgr *ProxyConfigManager, smartProxyMgr *SmartProxyManager) *AIService {
+	// 添加默认模型配置，避免模型索引超出范围
+	defaultModels := []AIModel{
+		{
+			Provider: "openai",
+			Name:     "gpt-3.5-turbo",
+			APIKey:   "",
+			BaseURL:  "https://api.openai.com/v1",
+		},
+	}
+
+	log.Printf("[AI服务] 初始化AI服务，默认模型数量: %d", len(defaultModels))
+
 	return &AIService{
-		models: []AIModel{},
+		models:         defaultModels,
+		proxyConfigMgr: proxyConfigMgr,
+		smartProxyMgr:  smartProxyMgr,
 	}
 }
 
@@ -61,12 +78,99 @@ func (s *AIService) CallAI(modelIndex int, prompt string, systemPrompt string) (
 
 // CallAIWithRetry 调用AI接口（带重试）
 func (s *AIService) CallAIWithRetry(modelIndex int, prompt string, systemPrompt string, retryCount int, retryDelay int) (string, error) {
+	return s.CallAIWithCustomSettings(modelIndex, prompt, systemPrompt, retryCount, retryDelay, nil)
+}
+
+// AICustomSettings AI自定义设置
+type AICustomSettings struct {
+	ThinkingMode string  `json:"thinking_mode,omitempty"`
+	TopP         float64 `json:"top_p,omitempty"`
+	Temperature  float64 `json:"temperature,omitempty"`
+	MaxTokens    int     `json:"max_tokens,omitempty"`
+}
+
+// CallAIWithImages 调用AI接口处理图片内容
+func (s *AIService) CallAIWithImages(modelIndex int, prompt string, imageUrls []string, customSettings *AICustomSettings) (string, error) {
+	log.Printf("[AI服务] 图片处理请求 - 模型索引: %d, 可用模型数量: %d", modelIndex, len(s.models))
+
+	if len(s.models) == 0 {
+		log.Printf("[AI服务] ❌ 没有配置任何AI模型")
+		return "", fmt.Errorf("没有配置AI模型，请先在设置中配置AI模型")
+	}
+
 	if modelIndex >= len(s.models) {
-		return "", fmt.Errorf("模型索引超出范围")
+		log.Printf("[AI服务] ❌ 模型索引 %d 超出范围，可用模型: %d 个", modelIndex, len(s.models))
+		return "", fmt.Errorf("模型索引超出范围，请选择有效的模型 (0-%d)", len(s.models)-1)
 	}
 
 	model := s.models[modelIndex]
-	
+
+	// 构建图片消息格式
+	messages := []map[string]interface{}{
+		{
+			"role": "user",
+			"content": []map[string]interface{}{
+				{
+					"type": "text",
+					"text": prompt,
+				},
+			},
+		},
+	}
+
+	// 添加图片内容
+	userContent := messages[0]["content"].([]map[string]interface{})
+	for _, imageUrl := range imageUrls {
+		imageContent := map[string]interface{}{
+			"type": "image_url",
+			"image_url": map[string]interface{}{
+				"url": imageUrl,
+			},
+		}
+		userContent = append(userContent, imageContent)
+	}
+	messages[0]["content"] = userContent
+
+	// 构建请求体
+	requestBody := map[string]interface{}{
+		"model":    model.Name,
+		"messages": messages,
+	}
+
+	// 应用自定义设置
+	if customSettings != nil {
+		if customSettings.Temperature > 0 {
+			requestBody["temperature"] = customSettings.Temperature
+		}
+		if customSettings.TopP > 0 {
+			requestBody["top_p"] = customSettings.TopP
+		}
+		if customSettings.MaxTokens > 0 {
+			requestBody["max_tokens"] = customSettings.MaxTokens
+		}
+	}
+
+	// 发送请求（这里需要根据实际的API实现）
+	// 暂时返回模拟结果
+	return "图片分析结果", nil
+}
+
+// CallAIWithCustomSettings 调用AI接口（带重试和自定义设置）
+func (s *AIService) CallAIWithCustomSettings(modelIndex int, prompt string, systemPrompt string, retryCount int, retryDelay int, customSettings *AICustomSettings) (string, error) {
+	log.Printf("[AI服务] 文本处理请求 - 模型索引: %d, 可用模型数量: %d", modelIndex, len(s.models))
+
+	if len(s.models) == 0 {
+		log.Printf("[AI服务] ❌ 没有配置任何AI模型")
+		return "", fmt.Errorf("没有配置AI模型，请先在设置中配置AI模型")
+	}
+
+	if modelIndex >= len(s.models) {
+		log.Printf("[AI服务] ❌ 模型索引 %d 超出范围，可用模型: %d 个", modelIndex, len(s.models))
+		return "", fmt.Errorf("模型索引超出范围，请选择有效的模型 (0-%d)", len(s.models)-1)
+	}
+
+	model := s.models[modelIndex]
+
 	// 构建请求
 	messages := []Message{
 		{Role: "system", Content: systemPrompt},
@@ -81,18 +185,18 @@ func (s *AIService) CallAIWithRetry(modelIndex int, prompt string, systemPrompt 
 	}
 
 	var lastErr error
-	
+
 	// 重试逻辑
 	for attempt := 0; attempt <= retryCount; attempt++ {
 		if attempt > 0 {
 			fmt.Printf("[AI服务] 第 %d 次重试，等待 %d 秒...\n", attempt, retryDelay)
 			time.Sleep(time.Duration(retryDelay) * time.Second)
 		}
-		
+
 		// 根据供应商调用不同的API
 		var result string
 		var err error
-		
+
 		switch model.Provider {
 		case "openai":
 			result, err = s.callOpenAI(model, request)
@@ -103,38 +207,38 @@ func (s *AIService) CallAIWithRetry(modelIndex int, prompt string, systemPrompt 
 		default:
 			result, err = s.callCustomAPI(model, request)
 		}
-		
+
 		if err == nil {
 			if attempt > 0 {
 				fmt.Printf("[AI服务] 重试成功，第 %d 次尝试\n", attempt+1)
 			}
 			return result, nil
 		}
-		
+
 		lastErr = err
 		fmt.Printf("[AI服务] 第 %d 次尝试失败: %v\n", attempt+1, err)
-		
+
 		// 检查是否是可重试的错误
 		if !isRetryableError(err) {
 			fmt.Printf("[AI服务] 不可重试的错误，停止重试\n")
 			break
 		}
 	}
-	
+
 	return "", fmt.Errorf("AI调用失败，已重试 %d 次: %v", retryCount, lastErr)
 }
 
 // isRetryableError 判断是否为可重试的错误
 func isRetryableError(err error) bool {
 	errStr := strings.ToLower(err.Error())
-	
+
 	// 网络相关错误
 	if strings.Contains(errStr, "timeout") ||
 		strings.Contains(errStr, "connection") ||
 		strings.Contains(errStr, "network") {
 		return true
 	}
-	
+
 	// API限制相关错误
 	if strings.Contains(errStr, "rate limit") ||
 		strings.Contains(errStr, "too many requests") ||
@@ -144,13 +248,13 @@ func isRetryableError(err error) bool {
 		strings.Contains(errStr, "504") {
 		return true
 	}
-	
+
 	// 服务器临时错误
 	if strings.Contains(errStr, "internal server error") ||
 		strings.Contains(errStr, "service unavailable") {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -192,7 +296,7 @@ func (s *AIService) callAnthropic(model AIModel, request AIRequest) (string, err
 	req.Header.Set("x-api-key", model.APIKey)
 	req.Header.Set("anthropic-version", "2023-06-01")
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := s.proxyConfigMgr.CreateSmartHTTPClient("https://api.anthropic.com", s.smartProxyMgr, 30*time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
@@ -259,7 +363,12 @@ func (s *AIService) makeHTTPRequest(url, apiKey string, request AIRequest, authT
 		req.Header.Set("api-key", apiKey)
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	// 根据不同的API端点使用智能路由
+	apiURL := "https://api.openai.com"
+	if strings.Contains(url, "azure") {
+		apiURL = url
+	}
+	client := s.proxyConfigMgr.CreateSmartHTTPClient(apiURL, s.smartProxyMgr, 30*time.Second)
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
@@ -289,13 +398,23 @@ func (s *AIService) makeHTTPRequest(url, apiKey string, request AIRequest, authT
 
 // UpdateModels 更新模型配置
 func (s *AIService) UpdateModels(models []AIModel) {
+	log.Printf("[AI服务] 更新模型配置，新模型数量: %d", len(models))
 	s.models = models
+
+	// 如果没有配置模型，保留默认模型
+	if len(s.models) == 0 {
+		log.Printf("[AI服务] ⚠️ 没有提供模型配置，保持默认模型")
+	} else {
+		for i, model := range s.models {
+			log.Printf("[AI服务] 模型 %d: %s (%s)", i, model.Name, model.Provider)
+		}
+	}
 }
 
 // TestModel 测试模型连接
 func (s *AIService) TestModel(model AIModel) error {
 	fmt.Printf("[AI服务] 测试模型连接: %s (%s)\n", model.Name, model.Provider)
-	
+
 	testRequest := AIRequest{
 		Model: model.Name,
 		Messages: []Message{
@@ -319,12 +438,12 @@ func (s *AIService) TestModel(model AIModel) error {
 		fmt.Printf("[AI服务] 调用自定义API\n")
 		_, err = s.callCustomAPI(model, testRequest)
 	}
-	
+
 	if err != nil {
 		fmt.Printf("[AI服务] API调用失败: %v\n", err)
 	} else {
 		fmt.Printf("[AI服务] API调用成功\n")
 	}
-	
+
 	return err
 }

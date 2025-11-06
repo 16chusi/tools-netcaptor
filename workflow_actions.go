@@ -106,7 +106,7 @@ func (we *WorkflowExecutor) executeClick(step ExecutionStep) (ExecutionResult, e
 		},
 	}
 
-	result, err := we.sendAndWait(msg, 10*time.Second, "click_element")
+	result, err := we.sendAndWait(msg, 30*time.Second, "click_element")
 	if err != nil {
 		log.Printf("[点击元素节点] 执行失败: %v", err)
 	} else {
@@ -160,7 +160,7 @@ func (we *WorkflowExecutor) executeInput(step ExecutionStep) (ExecutionResult, e
 	}
 
 	log.Printf("[输入文本节点] 发送WebSocket消息")
-	result, err := we.sendAndWait(msg, 10*time.Second, "input_text")
+	result, err := we.sendAndWait(msg, 30*time.Second, "input_text")
 	if err != nil {
 		log.Printf("[输入文本节点] 执行失败: %v", err)
 	} else {
@@ -218,7 +218,7 @@ func (we *WorkflowExecutor) executeExtract(step ExecutionStep) (ExecutionResult,
 	log.Printf("[获取网页内容节点] 发送WebSocket消息到浏览器扩展: %+v", msg)
 	log.Printf("[获取网页内容节点] 等待浏览器扩展响应...")
 
-	result, err := we.sendAndWait(msg, 10*time.Second, "extract")
+	result, err := we.sendAndWait(msg, 30*time.Second, "extract")
 
 	if err == nil && result.Success {
 		log.Printf("[获取网页内容节点] 收到成功响应: %+v", result.Data)

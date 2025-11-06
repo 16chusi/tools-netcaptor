@@ -25,7 +25,7 @@ func NewWorkflowExecutor(app *NetworkApp) *WorkflowExecutor {
 	return &WorkflowExecutor{
 		app:        app,
 		wsServer:   app.wsServer,
-		aiService:  NewAIService(),
+		aiService:  NewAIService(app.proxyConfigMgr, app.smartProxyMgr),
 		responseCh: make(chan WSMessage, 10),
 		variables:  make(map[string]interface{}),
 	}
