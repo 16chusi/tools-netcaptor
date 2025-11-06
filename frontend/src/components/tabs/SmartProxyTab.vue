@@ -55,9 +55,6 @@
     <div class="setting-item">
       <label>批量操作</label>
       <div class="batch-actions">
-        <button @click="addGoogleProxyRule" class="quick-fix-btn">
-          🚀 快速添加Google代理规则
-        </button>
         <button @click="clearAutoRules" class="clear-btn">
           清空自动学习规则
         </button>
@@ -176,29 +173,6 @@ async function clearAutoRules() {
 
 async function refreshRules() {
   await loadRules()
-}
-
-async function addGoogleProxyRule() {
-  try {
-    // 先删除可能存在的Google direct规则
-    const googleRules = rules.value.filter(rule => 
-      rule.pattern.includes('google') && rule.route_type === 'direct'
-    )
-    
-    for (const rule of googleRules) {
-      await RemoveSmartProxyRule(rule.id)
-    }
-    
-    // 添加正确的Google代理规则
-    await AddSmartProxyRule('*.google.com', 'proxy')
-    await AddSmartProxyRule('google.com', 'proxy')
-    
-    await loadRules()
-    alert('✅ Google代理规则已添加！')
-  } catch (error) {
-    console.error('添加Google代理规则失败:', error)
-    alert('添加Google代理规则失败: ' + error)
-  }
 }
 
 async function testRouting() {
@@ -396,20 +370,6 @@ function formatTime(timeStr: string): string {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-}
-
-.quick-fix-btn {
-  padding: 8px 16px;
-  border: 1px solid #52c41a;
-  background: #52c41a;
-  color: white;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.quick-fix-btn:hover {
-  background: #389e0d;
 }
 
 .clear-btn,

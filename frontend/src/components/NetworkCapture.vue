@@ -5,7 +5,7 @@
         <button @click="toggleProxy" :class="['icon-btn', proxyRunning ? 'recording' : '']"
                 :title="proxyRunning ? '停止代理' : '启动代理'">
           <span v-if="proxyRunning" class="record-dot"></span>
-          <span v-else>●</span>
+          <span v-else>▶️</span>
         </button>
         <button @click="clearAll" class="icon-btn" title="清空">🗑️</button>
         <input v-model="filterText" placeholder="Filter" class="filter-input"/>
@@ -47,7 +47,6 @@
         :visible="settingsVisible"
         v-model:proxyPort="proxyPort"
         v-model:selectedBrowser="selectedBrowser"
-        v-model:targetUrl="targetUrl"
         :downloadPath="downloadPath"
         :proxyRunning="proxyRunning"
         :wsPort="wsPort"
@@ -262,7 +261,6 @@ const activeTab = ref('headers')
 const filterText = ref('')
 const proxyRunning = ref(false)
 const proxyUrl = ref('')
-const targetUrl = ref('')
 const selectedBrowser = ref('chrome')
 const proxyPort = ref(8888)
 const certDialogVisible = ref(false)
@@ -399,30 +397,17 @@ async function clearAll() {
 }
 
 async function openBrowser() {
-  let url = targetUrl.value
-  if (!url) {
-    url = 'http://localhost:' + (await getTestPort())
-  }
-  if (!url.startsWith('http')) url = 'http://' + url
-
   try {
     if (selectedBrowser.value === 'chrome') {
-      await OpenInChrome(url)
+      await OpenInChrome('')
     } else if (selectedBrowser.value === 'edge') {
-      await OpenInEdge(url)
+      await OpenInEdge('')
     } else if (selectedBrowser.value === 'firefox') {
-      await OpenInFirefox(url)
+      await OpenInFirefox('')
     }
   } catch (e: any) {
     ShowErrorDialog('错误', `打开浏览器失败: ${e}`)
   }
-}
-
-async function getTestPort() {
-  if (webhookRunning.value && webhookPort.value) {
-    return webhookPort.value
-  }
-  return 9999
 }
 
 async function selectDownloadPath() {

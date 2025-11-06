@@ -44,12 +44,6 @@
             </div>
             
             <div class="setting-item">
-              <label>默认打开 URL</label>
-              <input :value="targetUrl" @input="$emit('update:targetUrl', ($event.target as HTMLInputElement).value)" class="setting-input" placeholder="留空使用测试服务器" />
-              <small>留空将打开内置测试服务器（随机端口）</small>
-            </div>
-            
-            <div class="setting-item">
               <label>下载路径</label>
               <div class="path-input-group">
               <input :value="downloadPath" class="setting-input" placeholder="默认下载目录" readonly />
@@ -118,7 +112,6 @@ const props = defineProps<{
   proxyPort: number
   proxyRunning: boolean
   selectedBrowser: string
-  targetUrl: string
   downloadPath: string
   wsPort?: number
   wsRunning?: boolean
@@ -162,7 +155,6 @@ const emit = defineEmits<{
   close: []
   'update:proxyPort': [value: number]
   'update:selectedBrowser': [value: string]
-  'update:targetUrl': [value: string]
   selectPath: []
   startWebSocket: []
   stopWebSocket: []
