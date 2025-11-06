@@ -52,13 +52,15 @@ func (cm *CertManager) loadOrGenerateCA() error {
 		certBlock, _ := pem.Decode(certPEM)
 		keyBlock, _ := pem.Decode(keyPEM)
 
-		cert, err := x509.ParseCertificate(certBlock.Bytes)
-		if err == nil {
-			key, err := x509.ParsePKCS1PrivateKey(keyBlock.Bytes)
+		if certBlock != nil && keyBlock != nil {
+			cert, err := x509.ParseCertificate(certBlock.Bytes)
 			if err == nil {
-				cm.caCert = cert
-				cm.caKey = key
-				return nil
+				key, err := x509.ParsePKCS1PrivateKey(keyBlock.Bytes)
+				if err == nil {
+					cm.caCert = cert
+					cm.caKey = key
+					return nil
+				}
 			}
 		}
 	}
@@ -114,6 +116,15 @@ func (cm *CertManager) generateCA() error {
 	os.WriteFile(keyFile, keyPEM, 0600)
 
 	return nil
+}
+
+func (cm *CertManager) GetCACert() *tls.Certificate {
+	// 返回用于GoProxy的CA证书
+	cert := &tls.Certificate{
+		Certificate: [][]byte{cm.caCert.Raw},
+		PrivateKey:  cm.caKey,
+	}
+	return cert
 }
 
 func (cm *CertManager) GetCertForHost(host string) (*tls.Certificate, error) {

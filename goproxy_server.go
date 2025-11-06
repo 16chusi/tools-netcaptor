@@ -38,6 +38,13 @@ func NewGoProxyServer(port int, capture *NetworkCapture) *GoProxyServer {
 		requestMap:  make(map[string]*NetworkRequest),
 	}
 
+	// 设置自定义CA证书
+	certManager, err := NewCertManager()
+	if err == nil {
+		// 使用我们的CA证书替代默认证书
+		goproxy.GoproxyCa = *certManager.GetCACert()
+	}
+
 	// 启用HTTPS MITM
 	proxy.OnRequest().HandleConnect(goproxy.AlwaysMitm)
 
