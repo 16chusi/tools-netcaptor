@@ -8,6 +8,30 @@
       <div class="drawer-content">
         <p>要捕获 HTTPS 请求，需要安装并信任此 CA 证书。</p>
         
+        <div class="cert-info">
+          <h4>📋 证书信息</h4>
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="label">状态:</span>
+              <span :class="certInfo?.exists ? 'status-ok' : 'status-error'">
+                {{ certInfo?.exists ? '✅ 已生成' : '❌ 未找到' }}
+              </span>
+            </div>
+            <div class="info-item" v-if="certInfo?.createdAt">
+              <span class="label">生成时间:</span>
+              <span>{{ certInfo.createdAt }}</span>
+            </div>
+            <div class="info-item" v-if="certInfo?.notBefore">
+              <span class="label">有效期:</span>
+              <span>{{ certInfo.notBefore }} 至 {{ certInfo.notAfter }}</span>
+            </div>
+            <div class="info-item" v-if="certInfo?.subject">
+              <span class="label">颁发给:</span>
+              <span>{{ certInfo.subject }}</span>
+            </div>
+          </div>
+        </div>
+
         <div class="cert-path">
           <strong>证书位置:</strong>
           <code>{{ certPath }}</code>
@@ -69,6 +93,7 @@ certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "GoProxy CA" -i {{ certPath }}
 defineProps<{
   visible: boolean
   certPath: string
+  certInfo: any
 }>()
 
 defineEmits<{
@@ -151,6 +176,48 @@ defineEmits<{
   margin-bottom: 16px;
   line-height: 1.6;
   text-align: left;
+}
+
+.cert-info {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.cert-info h4 {
+  margin: 0 0 12px 0;
+  color: #495057;
+  font-size: 14px;
+}
+
+.info-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+}
+
+.info-item .label {
+  font-weight: 500;
+  color: #6c757d;
+  min-width: 80px;
+  margin-right: 8px;
+}
+
+.status-ok {
+  color: #28a745;
+  font-weight: 500;
+}
+
+.status-error {
+  color: #dc3545;
+  font-weight: 500;
 }
 
 .cert-path {

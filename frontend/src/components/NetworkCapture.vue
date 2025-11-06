@@ -65,6 +65,7 @@
     <CertDrawer
         :visible="certDialogVisible"
         :certPath="certPath"
+        :certInfo="certInfo"
         @close="certDialogVisible = false"
     />
 
@@ -199,6 +200,16 @@
 </template>
 
 <script setup lang="ts">
+interface CertInfo {
+  exists: boolean
+  path: string
+  createdAt?: string
+  notBefore?: string
+  notAfter?: string
+  subject?: string
+  issuer?: string
+}
+
 import {computed, onMounted, onUnmounted, ref} from 'vue'
 import {
   ClearCapture,
@@ -206,6 +217,7 @@ import {
   ExportData,
   GetAllEntries,
   GetCACertPath,
+  GetCACertInfo,
   GetProxyURL,
   GetWebSocketPort,
   GetWebhookPort,
@@ -256,6 +268,7 @@ const proxyPort = ref(8888)
 const certDialogVisible = ref(false)
 const settingsVisible = ref(false)
 const certPath = ref('')
+const certInfo = ref<CertInfo | null>(null)
 const detailsHeight = ref(400)
 const isResizing = ref(false)
 const viewMode = ref('')
@@ -318,6 +331,7 @@ onMounted(async () => {
     proxyUrl.value = await GetProxyURL()
   }
   certPath.value = await GetCACertPath()
+  certInfo.value = await GetCACertInfo()
   
   // 获取 WebSocket 状态
   try {

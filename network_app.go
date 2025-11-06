@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"log"
 	"net/http"
@@ -148,6 +150,34 @@ func (na *NetworkApp) GetProxyPort() int {
 // 获取CA证书路径
 func (na *NetworkApp) GetCACertPath() string {
 	return na.proxy.GetCACertPath()
+}
+
+func (na *NetworkApp) GetCACertInfo() *CertInfo {
+	// 直接从GoProxy服务器获取证书路径和信息
+	certPath := na.proxy.GetCACertPath()
+	info := &CertInfo{
+		Path: certPath,
+	}
+
+	// 检查文件是否存在
+	if stat, err := os.Stat(certPath); err == nil {
+		info.Exists = true
+		info.CreatedAt = stat.ModTime().Format("2006-01-02 15:04:05")
+
+		// 尝试读取证书内容获取详细信息
+		if certPEM, err := os.ReadFile(certPath); err == nil {
+			if certBlock, _ := pem.Decode(certPEM); certBlock != nil {
+				if cert, err := x509.ParseCertificate(certBlock.Bytes); err == nil {
+					info.NotBefore = cert.NotBefore.Format("2006-01-02 15:04:05")
+					info.NotAfter = cert.NotAfter.Format("2006-01-02 15:04:05")
+					info.Subject = cert.Subject.String()
+					info.Issuer = cert.Issuer.String()
+				}
+			}
+		}
+	}
+
+	return info
 }
 
 // 导出数据

@@ -191,3 +191,36 @@ func (cm *CertManager) GetCACertPath() string {
 func (cm *CertManager) GetCACertPEM() ([]byte, error) {
 	return os.ReadFile(cm.GetCACertPath())
 }
+
+type CertInfo struct {
+	Exists    bool   `json:"exists"`
+	Path      string `json:"path"`
+	CreatedAt string `json:"createdAt"`
+	NotBefore string `json:"notBefore"`
+	NotAfter  string `json:"notAfter"`
+	Subject   string `json:"subject"`
+	Issuer    string `json:"issuer"`
+}
+
+func (cm *CertManager) GetCACertInfo() *CertInfo {
+	certPath := cm.GetCACertPath()
+	info := &CertInfo{
+		Path: certPath,
+	}
+
+	// 检查文件是否存在
+	if stat, err := os.Stat(certPath); err == nil {
+		info.Exists = true
+		info.CreatedAt = stat.ModTime().Format("2006-01-02 15:04:05")
+
+		// 读取证书详细信息
+		if cm.caCert != nil {
+			info.NotBefore = cm.caCert.NotBefore.Format("2006-01-02 15:04:05")
+			info.NotAfter = cm.caCert.NotAfter.Format("2006-01-02 15:04:05")
+			info.Subject = cm.caCert.Subject.String()
+			info.Issuer = cm.caCert.Issuer.String()
+		}
+	}
+
+	return info
+}
