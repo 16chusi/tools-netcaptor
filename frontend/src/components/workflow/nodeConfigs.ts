@@ -52,13 +52,9 @@ export const NODE_GROUPS: NodeGroup[] = [
     icon: '🤖',
     color: '#52c41a', // 绿色主题（与AI属性面板一致）
     nodes: [
-      { type: 'ai_extract_data', label: 'AI数据提取', icon: '🤖', color: 'rgba(82, 196, 26, 0.15)', description: '智能分析DOM并提取数据' },
-      { type: 'ai_smart_click', label: 'AI智能点击', icon: '🤖', color: 'rgba(82, 196, 26, 0.15)', description: '智能识别并点击元素' },
       { type: 'ai_analyze_content', label: 'AI内容分析', icon: '🤖', color: 'rgba(82, 196, 26, 0.15)', description: '理解和分析页面内容' },
-      { type: 'ai_validate_data', label: 'AI数据验证', icon: '🤖', color: 'rgba(82, 196, 26, 0.15)', description: '验证数据格式和内容' },
-      { type: 'ai_transform_data', label: 'AI数据转换', icon: '🤖', color: 'rgba(82, 196, 26, 0.15)', description: '转换数据格式和结构' },
-      { type: 'ai_form_fill', label: 'AI表单填写', icon: '🤖', color: 'rgba(82, 196, 26, 0.15)', description: '智能理解并填写表单' },
-      { type: 'ai_navigation', label: 'AI智能导航', icon: '🤖', color: 'rgba(82, 196, 26, 0.15)', description: '根据描述智能导航' }
+      { type: 'ai_extract_data', label: 'AI数据提取', icon: '🤖', color: 'rgba(82, 196, 26, 0.15)', description: '智能分析DOM并提取数据' },
+      { type: 'ai_transform_data', label: 'AI数据转换', icon: '🤖', color: 'rgba(82, 196, 26, 0.15)', description: '转换数据格式和结构' }
     ]
   },
   {

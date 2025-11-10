@@ -2,21 +2,14 @@
   <div class="ai-model-tab">
     <div class="section">
       <h3>🤖 AI模型配置</h3>
+      <p class="description">支持所有OpenAI兼容接口，包括OpenAI、智谱AI、DeepSeek、Ollama等</p>
+      
       <div class="model-list">
         <div v-for="(model, index) in models" :key="index" class="model-item">
           <div class="model-info">
             <div class="form-row">
-              <label>供应商:</label>
-              <select v-model="model.provider" class="provider-select">
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic</option>
-                <option value="azure">Azure OpenAI</option>
-                <option value="custom">自定义</option>
-              </select>
-            </div>
-            <div class="form-row">
               <label>模型名称:</label>
-              <input v-model="model.name" placeholder="gpt-4, claude-3-sonnet" class="model-input" />
+              <input v-model="model.name" placeholder="gpt-4, glm-4, deepseek-chat, llama3" class="model-input" />
             </div>
             <div class="form-row">
               <label>API Key:</label>
@@ -24,7 +17,14 @@
             </div>
             <div class="form-row">
               <label>Base URL:</label>
-              <input v-model="model.baseUrl" placeholder="https://api.openai.com/v1 (包含版本号)" class="model-input" />
+              <input v-model="model.baseUrl" placeholder="https://api.openai.com/v1" class="model-input" />
+              <div class="url-examples">
+                <span>常用地址:</span>
+                <button @click="setBaseUrl(index, 'https://api.openai.com/v1')" class="url-btn">OpenAI</button>
+                <button @click="setBaseUrl(index, 'https://open.bigmodel.cn/api/paas/v4')" class="url-btn">智谱AI</button>
+                <button @click="setBaseUrl(index, 'https://api.deepseek.com/v1')" class="url-btn">DeepSeek</button>
+                <button @click="setBaseUrl(index, 'http://localhost:11434/v1')" class="url-btn">Ollama</button>
+              </div>
             </div>
           </div>
           <div class="model-actions">
@@ -56,7 +56,7 @@
           默认模型:
           <select v-model="defaultModel" class="default-select">
             <option v-for="(model, index) in models" :key="index" :value="index">
-              {{ model.name || `${model.provider} 模型 ${index + 1}` }}
+              {{ model.name || `模型 ${index + 1}` }}
             </option>
           </select>
         </label>
@@ -100,16 +100,20 @@ const debounceTimers = reactive<Record<string, number>>({})
 
 function addModel() {
   models.value.push({
-    provider: 'openai',
+    provider: 'openai', // 统一使用openai兼容
     name: '',
     apiKey: '',
     baseUrl: ''
   })
 }
 
+function setBaseUrl(index: number, url: string) {
+  models.value[index].baseUrl = url
+}
+
 async function removeModel(index: number) {
   const model = models.value[index]
-  const modelName = model.name || `${model.provider} 模型`
+  const modelName = model.name || `模型 ${index + 1}`
   
   try {
     const result = await ShowQuestionDialog(
@@ -265,6 +269,16 @@ watch([models, defaultModel, defaultTemperature, defaultMaxTokens], () => {
   padding: 20px;
 }
 
+.description {
+  margin: 0 0 16px 0;
+  padding: 12px;
+  background: #e6f7ff;
+  border: 1px solid #91d5ff;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #0050b3;
+}
+
 .section {
   margin-bottom: 30px;
   padding: 20px;
@@ -308,11 +322,38 @@ watch([models, defaultModel, defaultTemperature, defaultMaxTokens], () => {
   color: #333;
 }
 
-.provider-select, .model-input {
+.model-input {
   padding: 8px 12px;
   border: 1px solid #d9d9d9;
   border-radius: 4px;
   font-size: 13px;
+}
+
+.url-examples {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.url-examples span {
+  color: #666;
+}
+
+.url-btn {
+  padding: 2px 8px;
+  background: #f0f0f0;
+  border: 1px solid #d9d9d9;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.2s;
+}
+
+.url-btn:hover {
+  background: #e6f7ff;
+  border-color: #91d5ff;
 }
 
 .model-actions {
@@ -321,7 +362,7 @@ watch([models, defaultModel, defaultTemperature, defaultMaxTokens], () => {
   flex-wrap: wrap;
 }
 
-.test-btn, .quick-test-btn, .remove-btn, .add-btn {
+.test-btn, .remove-btn, .add-btn {
   padding: 6px 12px;
   border: 1px solid #d9d9d9;
   border-radius: 4px;
@@ -336,13 +377,7 @@ watch([models, defaultModel, defaultTemperature, defaultMaxTokens], () => {
   border-color: #52c41a;
 }
 
-.quick-test-btn {
-  background: #1890ff;
-  color: white;
-  border-color: #1890ff;
-}
-
-.test-btn:disabled, .quick-test-btn:disabled {
+.test-btn:disabled {
   background: #f5f5f5;
   color: #999;
   cursor: not-allowed;

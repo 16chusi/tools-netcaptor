@@ -12,12 +12,8 @@ import JSONLProperty from './JSONLProperty.vue'
 import CollectProperty from './CollectProperty.vue'
 import DecryptProperty from './DecryptProperty.vue'
 import AIExtractProperty from './AIExtractProperty.vue'
-import AIClickProperty from './AIClickProperty.vue'
 import AIAnalyzeProperty from './AIAnalyzeProperty.vue'
-import AIValidateProperty from './AIValidateProperty.vue'
 import AITransformProperty from './AITransformProperty.vue'
-import AIFormFillProperty from './AIFormFillProperty.vue'
-import AINavigationProperty from './AINavigationProperty.vue'
 
 // 组件映射表
 export const propertyComponents = {
@@ -34,13 +30,9 @@ export const propertyComponents = {
   jsonl_reader: JSONLProperty,
   collect: CollectProperty,
   decrypt: DecryptProperty,
-  ai_extract_data: AIExtractProperty,
-  ai_smart_click: AIClickProperty,
   ai_analyze_content: AIAnalyzeProperty,
-  ai_validate_data: AIValidateProperty,
+  ai_extract_data: AIExtractProperty,
   ai_transform_data: AITransformProperty,
-  ai_form_fill: AIFormFillProperty,
-  ai_navigation: AINavigationProperty,
 }
 
 // 默认值配置
@@ -57,6 +49,16 @@ export const defaultValues = {
   jsonl_reader: { saveToVariable: 'data', extractKeys: '*', interval: 100 },
   collect: { format: 'jsonl' },
   decrypt: { saveToVariable: 'decryptedData', algorithm: 'sm4-ecb' },
+  ai_analyze_content: { 
+    saveToVariable: 'analysisResult', 
+    retryCount: 3, 
+    retryDelay: 2,
+    timeout: 100,
+    thinkingMode: 'enabled',
+    topP: 0.9,
+    temperature: 0.7,
+    maxTokens: 2000
+  },
   ai_extract_data: { 
     saveToVariable: 'extractedData', 
     outputFormat: 'json', 
@@ -69,18 +71,6 @@ export const defaultValues = {
     temperature: 0.7,
     maxTokens: 2000
   },
-  ai_smart_click: { waitTime: 3000, retryCount: 3, retryDelay: 2 },
-  ai_analyze_content: { 
-    saveToVariable: 'analysisResult', 
-    retryCount: 3, 
-    retryDelay: 2,
-    timeout: 100,
-    thinkingMode: 'enabled',
-    topP: 0.9,
-    temperature: 0.7,
-    maxTokens: 2000
-  },
-  ai_validate_data: { saveToVariable: 'validationResult', dataSource: 'current', retryCount: 3, retryDelay: 2 },
   ai_transform_data: { 
     saveToVariable: 'transformedData', 
     outputFormat: 'json', 
@@ -93,6 +83,4 @@ export const defaultValues = {
     temperature: 0.7,
     maxTokens: 2000
   },
-  ai_form_fill: { dataSource: 'current', retryCount: 3, retryDelay: 2 },
-  ai_navigation: { waitTime: 3000, retryCount: 3, retryDelay: 2 },
 }

@@ -174,6 +174,7 @@ func (s *AIService) CallAIWithCustomSettings(modelIndex int, prompt string, syst
 	}
 
 	model := s.models[modelIndex]
+	AppLog.Info(fmt.Sprintf("[AI服务] 使用模型: %s (%s)", model.Name, model.Provider))
 
 	// 构建请求
 	messages := []Message{
@@ -188,43 +189,50 @@ func (s *AIService) CallAIWithCustomSettings(modelIndex int, prompt string, syst
 		MaxTokens:   2000,
 	}
 
+	// 应用自定义设置
+	if customSettings != nil {
+		if customSettings.Temperature > 0 {
+			request.Temperature = customSettings.Temperature
+		}
+		if customSettings.MaxTokens > 0 {
+			request.MaxTokens = customSettings.MaxTokens
+		}
+	}
+
 	var lastErr error
 
-	// 重试逻辑
+	// 重试逻辑 - 使用指数退避策略
 	for attempt := 0; attempt <= retryCount; attempt++ {
 		if attempt > 0 {
-			AppLog.Info(fmt.Sprintf("[AI服务] 第 %d 次重试，等待 %d 秒...\n", attempt, retryDelay))
-			time.Sleep(time.Duration(retryDelay) * time.Second)
+			// 指数退避：第1次重试等待retryDelay秒，第2次等待retryDelay*2秒，以此类推
+			waitTime := time.Duration(retryDelay*(1<<(attempt-1))) * time.Second
+			if waitTime > 60*time.Second {
+				waitTime = 60 * time.Second // 最大等待60秒
+			}
+			AppLog.Info(fmt.Sprintf("[AI服务] 第 %d 次重试，等待 %v...", attempt, waitTime))
+			time.Sleep(waitTime)
 		}
 
-		// 根据供应商调用不同的API
-		var result string
-		var err error
+		AppLog.Info(fmt.Sprintf("[AI服务] 开始第 %d 次尝试调用AI", attempt+1))
 
-		switch model.Provider {
-		case "openai":
-			result, err = s.callOpenAI(model, request)
-		case "anthropic":
-			result, err = s.callAnthropic(model, request)
-		case "azure":
-			result, err = s.callAzureOpenAI(model, request)
-		default:
-			result, err = s.callCustomAPI(model, request)
-		}
+		// 统一使用OpenAI兼容接口
+		result, err := s.callOpenAICompatible(model, request)
 
 		if err == nil {
 			if attempt > 0 {
-				AppLog.Info(fmt.Sprintf("[AI服务] 重试成功，第 %d 次尝试\n", attempt+1))
+				AppLog.Info(fmt.Sprintf("[AI服务] ✅ 重试成功，第 %d 次尝试", attempt+1))
+			} else {
+				AppLog.Info(fmt.Sprintf("[AI服务] ✅ 首次调用成功"))
 			}
 			return result, nil
 		}
 
 		lastErr = err
-		AppLog.Info(fmt.Sprintf("[AI服务] 第 %d 次尝试失败: %v\n", attempt+1, err))
+		AppLog.Info(fmt.Sprintf("[AI服务] ❌ 第 %d 次尝试失败: %v", attempt+1, err))
 
 		// 检查是否是可重试的错误
 		if !isRetryableError(err) {
-			AppLog.Info(fmt.Sprintf("[AI服务] 不可重试的错误，停止重试\n"))
+			AppLog.Info(fmt.Sprintf("[AI服务] 不可重试的错误，停止重试"))
 			break
 		}
 	}
@@ -238,122 +246,66 @@ func isRetryableError(err error) bool {
 
 	// 网络相关错误
 	if strings.Contains(errStr, "timeout") ||
+		strings.Contains(errStr, "deadline exceeded") ||
 		strings.Contains(errStr, "connection") ||
-		strings.Contains(errStr, "network") {
+		strings.Contains(errStr, "network") ||
+		strings.Contains(errStr, "dial") ||
+		strings.Contains(errStr, "reset") ||
+		strings.Contains(errStr, "broken pipe") ||
+		strings.Contains(errStr, "no such host") ||
+		strings.Contains(errStr, "temporary failure") {
 		return true
 	}
 
 	// API限制相关错误
 	if strings.Contains(errStr, "rate limit") ||
 		strings.Contains(errStr, "too many requests") ||
+		strings.Contains(errStr, "quota exceeded") ||
 		strings.Contains(errStr, "429") ||
 		strings.Contains(errStr, "503") ||
 		strings.Contains(errStr, "502") ||
-		strings.Contains(errStr, "504") {
+		strings.Contains(errStr, "504") ||
+		strings.Contains(errStr, "gateway timeout") {
 		return true
 	}
 
 	// 服务器临时错误
 	if strings.Contains(errStr, "internal server error") ||
-		strings.Contains(errStr, "service unavailable") {
+		strings.Contains(errStr, "service unavailable") ||
+		strings.Contains(errStr, "bad gateway") ||
+		strings.Contains(errStr, "server error") {
 		return true
 	}
 
 	return false
 }
 
-// callOpenAI 调用OpenAI API
-func (s *AIService) callOpenAI(model AIModel, request AIRequest) (string, error) {
-	url := "https://api.openai.com/v1/chat/completions"
-	if model.BaseURL != "" {
-		url = model.BaseURL + "/chat/completions"
+// callOpenAICompatible 调用OpenAI兼容接口
+func (s *AIService) callOpenAICompatible(model AIModel, request AIRequest) (string, error) {
+	// 构建API URL
+	baseURL := model.BaseURL
+	if baseURL == "" {
+		baseURL = "https://api.openai.com/v1"
 	}
 
-	return s.makeHTTPRequest(url, model.APIKey, request, "Bearer")
-}
+	// 移除末尾的斜杠
+	baseURL = strings.TrimSuffix(baseURL, "/")
+	url := baseURL + "/chat/completions"
 
-// callAnthropic 调用Anthropic API
-func (s *AIService) callAnthropic(model AIModel, request AIRequest) (string, error) {
-	url := "https://api.anthropic.com/v1/messages"
-	if model.BaseURL != "" {
-		url = model.BaseURL + "/messages"
-	}
-
-	// Anthropic使用不同的请求格式
-	anthropicRequest := map[string]interface{}{
-		"model":      request.Model,
-		"max_tokens": request.MaxTokens,
-		"messages":   request.Messages,
-	}
-
-	jsonData, err := json.Marshal(anthropicRequest)
-	if err != nil {
-		return "", err
-	}
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return "", err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", model.APIKey)
-	req.Header.Set("anthropic-version", "2023-06-01")
-
-	client := s.proxyConfigMgr.CreateSmartHTTPClient("https://api.anthropic.com", s.smartProxyMgr, 30*time.Second)
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API调用失败: %s", string(body))
-	}
-
-	var response AIResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return "", err
-	}
-
-	if len(response.Choices) > 0 {
-		return response.Choices[0].Message.Content, nil
-	}
-
-	return "", fmt.Errorf("未收到有效响应")
-}
-
-// callAzureOpenAI 调用Azure OpenAI API
-func (s *AIService) callAzureOpenAI(model AIModel, request AIRequest) (string, error) {
-	if model.BaseURL == "" {
-		return "", fmt.Errorf("Azure OpenAI需要配置BaseURL")
-	}
-
-	url := model.BaseURL + "/openai/deployments/" + request.Model + "/chat/completions?api-version=2023-12-01-preview"
-	return s.makeHTTPRequest(url, model.APIKey, request, "api-key")
-}
-
-// callCustomAPI 调用自定义API
-func (s *AIService) callCustomAPI(model AIModel, request AIRequest) (string, error) {
-	if model.BaseURL == "" {
-		return "", fmt.Errorf("自定义API需要配置BaseURL")
-	}
-
-	url := model.BaseURL + "/chat/completions"
 	return s.makeHTTPRequest(url, model.APIKey, request, "Bearer")
 }
 
 // makeHTTPRequest 发送HTTP请求
 func (s *AIService) makeHTTPRequest(url, apiKey string, request AIRequest, authType string) (string, error) {
-	jsonData, err := json.Marshal(request)
+	// 验证和清理请求参数
+	cleanedRequest := s.cleanAIRequest(request, url)
+
+	jsonData, err := json.Marshal(cleanedRequest)
 	if err != nil {
 		return "", err
 	}
+
+	AppLog.Info(fmt.Sprintf("[AI服务] 请求参数: %s", string(jsonData)))
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -367,14 +319,28 @@ func (s *AIService) makeHTTPRequest(url, apiKey string, request AIRequest, authT
 		req.Header.Set("api-key", apiKey)
 	}
 
-	// 根据不同的API端点使用智能路由
+	// 根据不同的API端点使用智能路由和适当的超时时间
 	apiURL := "https://api.openai.com"
+	timeout := 60 * time.Second // 默认60秒超时
+
+	// 针对不同API设置不同的超时时间
 	if strings.Contains(url, "azure") {
 		apiURL = url
+		timeout = 90 * time.Second // Azure API可能需要更长时间
+	} else if strings.Contains(url, "bigmodel.cn") {
+		apiURL = "https://open.bigmodel.cn"
+		timeout = 120 * time.Second // 智谱AI需要更长超时时间
+	} else if strings.Contains(url, "anthropic.com") {
+		apiURL = "https://api.anthropic.com"
+		timeout = 90 * time.Second
 	}
-	client := s.proxyConfigMgr.CreateSmartHTTPClient(apiURL, s.smartProxyMgr, 30*time.Second)
+
+	AppLog.Info(fmt.Sprintf("[AI服务] 发送请求到: %s (超时: %v)", url, timeout))
+
+	client := s.proxyConfigMgr.CreateSmartHTTPClient(apiURL, s.smartProxyMgr, timeout)
 	resp, err := client.Do(req)
 	if err != nil {
+		AppLog.Info(fmt.Sprintf("[AI服务] 请求失败: %v", err))
 		return "", err
 	}
 	defer resp.Body.Close()
@@ -384,20 +350,55 @@ func (s *AIService) makeHTTPRequest(url, apiKey string, request AIRequest, authT
 		return "", err
 	}
 
+	AppLog.Info(fmt.Sprintf("[AI服务] 收到响应，状态码: %d", resp.StatusCode))
+
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API调用失败: %s", string(body))
+		AppLog.Info(fmt.Sprintf("[AI服务] API调用失败，响应: %s", string(body)))
+		return "", fmt.Errorf("API调用失败 (状态码: %d): %s", resp.StatusCode, string(body))
 	}
 
 	var response AIResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return "", err
+		AppLog.Info(fmt.Sprintf("[AI服务] 响应解析失败: %v, 原始响应: %s", err, string(body)))
+		return "", fmt.Errorf("响应解析失败: %v", err)
 	}
 
 	if len(response.Choices) > 0 {
+		AppLog.Info(fmt.Sprintf("[AI服务] 成功获取AI响应"))
 		return response.Choices[0].Message.Content, nil
 	}
 
 	return "", fmt.Errorf("未收到有效响应")
+}
+
+// cleanAIRequest 清理和验证AI请求参数
+func (s *AIService) cleanAIRequest(request AIRequest, url string) AIRequest {
+	cleaned := request
+
+	// 通用参数验证
+	if cleaned.Temperature <= 0 || cleaned.Temperature > 2 {
+		cleaned.Temperature = 0.7
+	}
+
+	if cleaned.MaxTokens <= 0 || cleaned.MaxTokens > 8192 {
+		cleaned.MaxTokens = 2000
+	}
+
+	// 确保消息不为空
+	if len(cleaned.Messages) == 0 {
+		cleaned.Messages = []Message{
+			{Role: "user", Content: "Hello"},
+		}
+	}
+
+	// 检查消息内容长度
+	for i, msg := range cleaned.Messages {
+		if len(msg.Content) > 20000 {
+			cleaned.Messages[i].Content = msg.Content[:20000] + "..."
+		}
+	}
+
+	return cleaned
 }
 
 // UpdateModels 更新模型配置
@@ -422,7 +423,7 @@ func (s *AIService) GetModels() []AIModel {
 
 // TestModel 测试模型连接
 func (s *AIService) TestModel(model AIModel) error {
-	AppLog.Info(fmt.Sprintf("[AI服务] 测试模型连接: %s (%s)\n", model.Name, model.Provider))
+	AppLog.Info(fmt.Sprintf("[AI服务] 测试模型连接: %s", model.Name))
 
 	testRequest := AIRequest{
 		Model: model.Name,
@@ -432,26 +433,12 @@ func (s *AIService) TestModel(model AIModel) error {
 		MaxTokens: 10,
 	}
 
-	var err error
-	switch model.Provider {
-	case "openai":
-		AppLog.Info(fmt.Sprintf("[AI服务] 调用OpenAI API\n"))
-		_, err = s.callOpenAI(model, testRequest)
-	case "anthropic":
-		AppLog.Info(fmt.Sprintf("[AI服务] 调用Anthropic API\n"))
-		_, err = s.callAnthropic(model, testRequest)
-	case "azure":
-		AppLog.Info(fmt.Sprintf("[AI服务] 调用Azure OpenAI API\n"))
-		_, err = s.callAzureOpenAI(model, testRequest)
-	default:
-		AppLog.Info(fmt.Sprintf("[AI服务] 调用自定义API\n"))
-		_, err = s.callCustomAPI(model, testRequest)
-	}
+	_, err := s.callOpenAICompatible(model, testRequest)
 
 	if err != nil {
-		AppLog.Info(fmt.Sprintf("[AI服务] API调用失败: %v\n", err))
+		AppLog.Info(fmt.Sprintf("[AI服务] API调用失败: %v", err))
 	} else {
-		AppLog.Info(fmt.Sprintf("[AI服务] API调用成功\n"))
+		AppLog.Info(fmt.Sprintf("[AI服务] API调用成功"))
 	}
 
 	return err
