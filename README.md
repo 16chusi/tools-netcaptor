@@ -2,16 +2,31 @@
 
 <div align="center">
 
+<img src="https://raw.githubusercontent.com/16chusi/tools-netcaptor/main/docs/assets/logo.png" alt="NetCaptor Logo" width="120" height="120">
+
 **强大的网络抓包与分析工具**
 
 基于 Wails + Go + Vue3 构建的跨平台网络流量捕获工具
 
-[![Go Version](https://img.shields.io/badge/Go-1.23-00ADD8?style=flat&logo=go)](https://golang.org/)
-[![Wails](https://img.shields.io/badge/Wails-v2.10.2-DF0000?style=flat&logo=wails)](https://wails.io/)
-[![Vue](https://img.shields.io/badge/Vue-3.2-4FC08D?style=flat&logo=vue.js)](https://vuejs.org/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/16chusi/tools-netcaptor?style=for-the-badge&logo=github&color=yellow)](https://github.com/16chusi/tools-netcaptor/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/16chusi/tools-netcaptor?style=for-the-badge&logo=github&color=blue)](https://github.com/16chusi/tools-netcaptor/network)
+[![GitHub issues](https://img.shields.io/github/issues/16chusi/tools-netcaptor?style=for-the-badge&logo=github&color=red)](https://github.com/16chusi/tools-netcaptor/issues)
+[![GitHub license](https://img.shields.io/github/license/16chusi/tools-netcaptor?style=for-the-badge&logo=apache&color=green)](LICENSE)
 
-[功能特性](#-功能特性) • [快速开始](#-快速开始) • [使用指南](#-使用指南) • [技术栈](#-技术栈) • [截图](#-截图)
+[![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat-square&logo=go&logoColor=white)](https://golang.org/)
+[![Wails](https://img.shields.io/badge/Wails-v2.10.2-DF0000?style=flat-square&logo=wails&logoColor=white)](https://wails.io/)
+[![Vue](https://img.shields.io/badge/Vue-3.2+-4FC08D?style=flat-square&logo=vue.js&logoColor=white)](https://vuejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+
+[![GitHub release](https://img.shields.io/github/v/release/16chusi/tools-netcaptor?style=flat-square&logo=github)](https://github.com/16chusi/tools-netcaptor/releases)
+[![GitHub downloads](https://img.shields.io/github/downloads/16chusi/tools-netcaptor/total?style=flat-square&logo=github&color=brightgreen)](https://github.com/16chusi/tools-netcaptor/releases)
+[![GitHub last commit](https://img.shields.io/github/last-commit/16chusi/tools-netcaptor?style=flat-square&logo=github)](https://github.com/16chusi/tools-netcaptor/commits)
+
+[🚀 功能特性](#-功能特性) • [⚡ 快速开始](#-快速开始) • [📖 使用指南](#-使用指南) • [🛠️ 技术栈](#-技术栈) • [📸 截图](#-截图) • [🤝 贡献](#-贡献)
+
+---
+
+**⭐ 如果这个项目对你有帮助，请给一个 Star！**
 
 </div>
 
@@ -237,13 +252,19 @@ wails dev -tags webkit2_41
 ## 📸 截图
 
 ### 主界面
-![主界面](docs/img.png)
+![主界面](docs/assets/01.png)
 
-### 请求详情
-![请求详情](docs/img_1.png)
+### 请求编排
+![请求详情](docs/assets/02.png)
+
+### 拦截规则
+![请求详情](docs/assets/03.png)
+
+### 拦截设置
+![请求详情](docs/assets/04.png)
 
 ### 证书安装
-![证书安装](docs/img_2.png)
+![证书安装](docs/assets/05.png)
 
 ---
 
@@ -334,7 +355,23 @@ kill -9 <PID>
 
 ## 📝 许可证
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
+本项目采用 Apache License 2.0 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
+
+```
+Copyright 2024 NetCaptor Contributors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
 
 ---
 
@@ -344,18 +381,32 @@ kill -9 <PID>
 
 ---
 
+<div align="center">
+
 ## 📮 联系方式
 
-- **作者**: fzxs
-- **邮箱**: fzxs88@yeah.net
-- **问题反馈**: [GitHub Issues](../../issues)
+[![Email](https://img.shields.io/badge/Email-fzxs88%40yeah.net-red?style=for-the-badge&logo=gmail&logoColor=white)](mailto:fzxs88@yeah.net)
+[![GitHub](https://img.shields.io/badge/GitHub-16chusi-black?style=for-the-badge&logo=github&logoColor=white)](https://github.com/16chusi)
+[![Issues](https://img.shields.io/badge/Issues-Report%20Bug-orange?style=for-the-badge&logo=github&logoColor=white)](https://github.com/16chusi/tools-netcaptor/issues)
 
 ---
 
-<div align="center">
+### 🌟 项目统计
+
+![GitHub Repo stars](https://img.shields.io/github/stars/16chusi/tools-netcaptor?style=social)
+![GitHub watchers](https://img.shields.io/github/watchers/16chusi/tools-netcaptor?style=social)
+![GitHub forks](https://img.shields.io/github/forks/16chusi/tools-netcaptor?style=social)
+
+### 📈 Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=16chusi/tools-netcaptor&type=Date)](https://star-history.com/#16chusi/tools-netcaptor&Date)
+
+---
 
 **如果这个项目对你有帮助，请给一个 ⭐️**
 
-Made with ❤️ by fzxs
+**Made with ❤️ by [fzxs](https://github.com/16chusi)**
+
+*NetCaptor - 让网络抓包变得简单而强大*
 
 </div>

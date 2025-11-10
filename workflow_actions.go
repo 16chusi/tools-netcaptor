@@ -40,16 +40,8 @@ func (we *WorkflowExecutor) executeStep(step ExecutionStep) (ExecutionResult, er
 		return we.executeAIExtractData(step)
 	case "ai_analyze_content":
 		return we.executeAIAnalyzeContent(step)
-	case "ai_validate_data":
-		return we.executeAIValidateData(step)
 	case "ai_transform_data":
 		return we.executeAITransformData(step)
-	case "ai_smart_click":
-		return we.executeAISmartClick(step)
-	case "ai_form_fill":
-		return we.executeAIFormFill(step)
-	case "ai_navigation":
-		return we.executeAINavigation(step)
 	default:
 		return ExecutionResult{Success: false}, fmt.Errorf("未知的操作类型: %s", step.Action)
 	}
