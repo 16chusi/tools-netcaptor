@@ -76,24 +76,47 @@ type CertInfo struct {
 
 // types.InterceptRule 拦截规则
 type InterceptRule struct {
-	ID              string `json:"id"`
-	Name            string `json:"name"`
-	URLPattern      string `json:"urlPattern"`
-	Enabled         bool   `json:"enabled"`
-	ActionType      string `json:"actionType"`
-	StatusCode      int    `json:"statusCode,omitempty"`
-	ContentType     string `json:"contentType,omitempty"`
-	Body            string `json:"body,omitempty"`
-	Headers         string `json:"headers,omitempty"`
-	FindText        string `json:"findText,omitempty"`
-	ReplaceText     string `json:"replaceText,omitempty"`
-	UseRegex        bool   `json:"useRegex,omitempty"`
-	ReplaceAll      bool   `json:"replaceAll,omitempty"`
-	ResponseContent string `json:"responseContent,omitempty"`
-	RedirectURL     string `json:"redirectUrl,omitempty"`
-	WebhookURL      string `json:"webhookUrl,omitempty"`
-	WebhookEnabled  bool   `json:"webhookEnabled,omitempty"`
-	SaveToFile      bool   `json:"saveToFile,omitempty"`
-	SaveFilePath    string `json:"saveFilePath,omitempty"`
-	SaveFormat      string `json:"saveFormat,omitempty"`
+	ID              string            `json:"id"`
+	Name            string            `json:"name"`
+	URLPattern      string            `json:"urlPattern"`
+	Enabled         bool              `json:"enabled"`
+	ActionType      string            `json:"actionType"`
+	StatusCode      int               `json:"statusCode,omitempty"`
+	ContentType     string            `json:"contentType,omitempty"`
+	Body            string            `json:"body,omitempty"`
+	Headers         string            `json:"headers,omitempty"`
+	FindText        string            `json:"findText,omitempty"`
+	ReplaceText     string            `json:"replaceText,omitempty"`
+	UseRegex        bool              `json:"useRegex,omitempty"`
+	ReplaceAll      bool              `json:"replaceAll,omitempty"`
+	ResponseContent string            `json:"responseContent,omitempty"`
+	RedirectURL     string            `json:"redirectUrl,omitempty"`
+	WebhookURL      string            `json:"webhookUrl,omitempty"`
+	WebhookEnabled  bool              `json:"webhookEnabled,omitempty"`
+	WebhookSync     bool              `json:"webhookSync,omitempty"` // 同步等待webhook响应
+	SaveToFile      bool              `json:"saveToFile,omitempty"`
+	SaveFilePath    string            `json:"saveFilePath,omitempty"`
+	SaveFormat      string            `json:"saveFormat,omitempty"`
+	RemoteHTTP      *RemoteHTTPConfig `json:"remoteHTTP,omitempty"`     // 远程HTTP配置
+	ForwardRequest  *ForwardConfig    `json:"forwardRequest,omitempty"` // 请求转发配置
+}
+
+// RemoteHTTPConfig 远程HTTP请求配置
+type RemoteHTTPConfig struct {
+	URL          string            `json:"url"`          // 远程服务URL
+	Method       string            `json:"method"`       // HTTP方法，默认POST
+	Headers      map[string]string `json:"headers"`      // 请求头
+	Timeout      int               `json:"timeout"`      // 超时时间(毫秒)，默认5000
+	SendOriginal bool              `json:"sendOriginal"` // 是否发送原始响应体
+	UseResponse  bool              `json:"useResponse"`  // 是否使用远程响应替换
+	BodyTemplate string            `json:"bodyTemplate"` // 请求体模板
+}
+
+// ForwardConfig 请求转发配置
+type ForwardConfig struct {
+	TargetURL      string            `json:"targetUrl"`      // 目标URL
+	ReplaceHost    bool              `json:"replaceHost"`    // 是否替换Host头
+	ReplaceHeaders map[string]string `json:"replaceHeaders"` // 替换的请求头
+	Timeout        int               `json:"timeout"`        // 超时时间(毫秒)
+	KeepPath       bool              `json:"keepPath"`       // 保持原路径
 }

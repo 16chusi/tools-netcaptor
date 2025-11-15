@@ -2,235 +2,253 @@
   <div v-if="visible" class="drawer-overlay">
     <div class="drawer" @click.stop>
       <div class="drawer-header">
-        <h3>{{ rule.id ? '编辑规则' : '新建规则' }}</h3>
+        <h3>{{ localRule.id ? '编辑规则' : '新建规则' }}</h3>
         <button @click="$emit('close')" class="close-btn">✕</button>
       </div>
       <div class="drawer-body">
         <div class="form-group">
           <label>规则名称</label>
-          <input v-model="rule.name" type="text" placeholder="例如: Mock API 响应">
+          <input v-model="localRule.name" type="text" placeholder="例如: Mock API 响应">
         </div>
         
         <div class="form-group">
           <label>URL 模式</label>
-          <input v-model="rule.urlPattern" type="text" placeholder="例如: *.example.com 或 /api/*">
+          <input v-model="localRule.urlPattern" type="text" placeholder="例如: *.example.com 或 /api/*">
           <small>支持通配符 *，例如: *.example.com, /api/*, */user/*</small>
         </div>
         
         <div class="form-group">
           <label>操作类型</label>
-          <select v-model="rule.actionType">
+          <select v-model="localRule.actionType">
             <option value="findReplace">内容替换</option>
             <option value="redirect">重定向</option>
             <option value="responseReplace">响应结果替换</option>
+            <option value="remoteHTTP">远程HTTP处理</option>
+            <option value="forwardRequest">请求转发</option>
             <option value="saveToFile">保存到文件</option>
           </select>
         </div>
         
         <!-- 内容替换 -->
-        <div v-if="rule.actionType === 'findReplace'">
+        <div v-if="localRule.actionType === 'findReplace'">
           <div class="form-group">
             <label>查找</label>
-            <input v-model="rule.findText" type="text" placeholder="输入要查找的内容">
+            <input v-model="localRule.findText" type="text" placeholder="输入要查找的内容">
           </div>
           <div class="form-group">
             <label>替换</label>
-            <input v-model="rule.replaceText" type="text" placeholder="输入替换后的内容">
+            <input v-model="localRule.replaceText" type="text" placeholder="输入替换后的内容">
           </div>
           <div class="form-group">
             <label class="checkbox-label">
-              <input v-model="rule.useRegex" type="checkbox">
+              <input v-model="localRule.useRegex" type="checkbox">
               使用正则表达式
             </label>
           </div>
           <div class="form-group">
             <label class="checkbox-label">
-              <input v-model="rule.replaceAll" type="checkbox">
+              <input v-model="localRule.replaceAll" type="checkbox">
               替换全部匹配项
             </label>
           </div>
         </div>
         
         <!-- 重定向 -->
-        <div v-if="rule.actionType === 'redirect'" class="form-group">
+        <div v-if="localRule.actionType === 'redirect'" class="form-group">
           <label>重定向 URL</label>
-          <input v-model="rule.redirectUrl" type="text" placeholder="例如: https://example.com/new-image.png">
+          <input v-model="localRule.redirectUrl" type="text" placeholder="例如: https://example.com/new-image.png">
           <small>请求将返回 302 重定向到此 URL</small>
         </div>
         
         <!-- 响应结果替换 -->
-        <div v-if="rule.actionType === 'responseReplace'" class="form-group">
+        <div v-if="localRule.actionType === 'responseReplace'" class="form-group">
           <label>响应内容</label>
-          <textarea v-model="rule.responseContent" rows="8" placeholder="输入完整的响应内容"></textarea>
+          <textarea v-model="localRule.responseContent" rows="8" placeholder="输入完整的响应内容"></textarea>
           <small>将完全替换原始响应内容</small>
         </div>
+
+        <!-- 远程HTTP处理 -->
+        <div v-if="localRule.actionType === 'remoteHTTP'">
+          <div class="form-group">
+            <label>远程服务URL</label>
+            <input v-model="remoteHTTP.url" type="text" placeholder="http://localhost:3000/transform">
+          </div>
+          <div class="form-group">
+            <label>HTTP方法</label>
+            <select v-model="remoteHTTP.method">
+              <option value="POST">POST</option>
+              <option value="GET">GET</option>
+              <option value="PUT">PUT</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>超时时间(毫秒)</label>
+            <input v-model.number="remoteHTTP.timeout" type="number" placeholder="5000">
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input v-model="remoteHTTP.sendOriginal" type="checkbox">
+              发送原始响应体
+            </label>
+            <small>勾选后直接发送原始响应，否则发送JSON格式</small>
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input v-model="remoteHTTP.useResponse" type="checkbox">
+              使用远程响应替换
+            </label>
+            <small>勾选后用远程服务返回的内容替换原响应</small>
+          </div>
+          <div class="form-group">
+            <label>请求体模板(可选)</label>
+            <textarea v-model="remoteHTTP.bodyTemplate" rows="4" placeholder='{"url": "{{url}}", "data": "{{body}}"}'></textarea>
+            <small v-text="'支持变量: {{url}}, {{body}}'"></small>
+          </div>
+        </div>
         
+        <!-- 请求转发 -->
+        <div v-if="localRule.actionType === 'forwardRequest'">
+          <div class="form-group">
+            <label>目标URL</label>
+            <input v-model="forwardConfig.targetUrl" type="text" placeholder="http://localhost:3000">
+            <small>请求将被转发到此URL</small>
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input v-model="forwardConfig.keepPath" type="checkbox">
+              保持原路径
+            </label>
+            <small>勾选后保留原请求路径，否则使用目标URL的路径</small>
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input v-model="forwardConfig.replaceHost" type="checkbox">
+              替换Host头
+            </label>
+            <small>勾选后将Host头替换为目标主机</small>
+          </div>
+          <div class="form-group">
+            <label>超时时间(毫秒)</label>
+            <input v-model.number="forwardConfig.timeout" type="number" placeholder="30000">
+          </div>
+        </div>
+        
+        <!-- Webhook配置 -->
         <div class="form-group">
           <label class="checkbox-label">
-            <input v-model="rule.webhookEnabled" type="checkbox">
+            <input v-model="localRule.webhookEnabled" type="checkbox">
             启用 Webhook 推送
           </label>
         </div>
         
-        <div v-if="rule.webhookEnabled" class="form-group">
-          <label>Webhook URL</label>
-          <input v-model="rule.webhookUrl" type="text" placeholder="http://localhost:3000/webhook">
+        <div v-if="localRule.webhookEnabled">
+          <div class="form-group">
+            <label>Webhook URL</label>
+            <input v-model="localRule.webhookUrl" type="text" placeholder="http://localhost:3000/webhook">
+          </div>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input v-model="localRule.webhookSync" type="checkbox">
+              同步等待响应
+            </label>
+            <small>勾选后会等待webhook返回，并可用返回内容替换响应</small>
+          </div>
         </div>
         
         <!-- 保存到文件 -->
-        <div v-if="rule.actionType === 'saveToFile'">
-          <div class="form-group">
-            <label>文件路径</label>
-            <div style="display: flex; gap: 8px; flex: 1;">
-              <input v-model="rule.saveFilePath" type="text" placeholder="/tmp/captured.jsonl" style="flex: 1;">
-              <button @click="selectSaveFile" type="button" style="padding: 8px 12px; border: 1px solid #dadce0; background: white; border-radius: 4px; cursor: pointer;">选择</button>
-            </div>
-            <small>响应内容将自动追加到此文件</small>
-          </div>
-          <div class="form-group">
-            <label>保存格式</label>
-            <select v-model="rule.saveFormat">
-              <option value="jsonl">JSONL (每行一个JSON)</option>
-              <option value="text">文本 (每行追加)</option>
-            </select>
-          </div>
-        </div>
-        
-        <div class="examples-section">
-          <div class="examples-title">💡 使用示例</div>
-          
-          <div class="example-item">
-            <div class="example-title">示例 1: 内容替换</div>
-            <div class="example-desc">操作类型: <strong>内容替换</strong></div>
-            <div class="example-field">查找: <code>error</code></div>
-            <div class="example-field">替换: <code>success</code></div>
-            <div class="example-desc">将响应中所有 "error" 替换为 "success"</div>
-          </div>
-          
-          <div class="example-item">
-            <div class="example-title">示例 2: 正则替换</div>
-            <div class="example-desc">操作类型: <strong>内容替换</strong> + 勾选正则</div>
-            <div class="example-field">查找: <code>"status":\s*"\w+"</code></div>
-            <div class="example-field">替换: <code>"status": "success"</code></div>
-          </div>
-          
-          <div class="example-item">
-            <div class="example-title">示例 3: 重定向</div>
-            <div class="example-desc">操作类型: <strong>重定向</strong></div>
-            <div class="example-field">重定向 URL: <code>https://example.com/new.png</code></div>
-          </div>
-          
-          <div class="example-item">
-            <div class="example-title">示例 4: 响应结果替换</div>
-            <div class="example-desc">操作类型: <strong>响应结果替换</strong></div>
-            <div class="example-code">{"status": "success", "data": []}</div>
-            <div class="example-desc">完全替换整个响应内容</div>
-          </div>
+        <div v-if="localRule.actionType === 'saveToFile'" class="form-group">
+          <label>保存路径</label>
+          <input v-model="localRule.saveFilePath" type="text" placeholder="/path/to/save.jsonl">
         </div>
       </div>
       <div class="drawer-footer">
-        <button @click="$emit('close')" class="footer-btn">取消</button>
-        <button @click="handleSave" class="footer-btn primary">保存</button>
+        <button @click="$emit('close')" class="btn-secondary">取消</button>
+        <button @click="handleSave" class="btn-primary">保存</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
-import type { InterceptRule } from '../types/intercept'
-import {SelectSaveFilePath, ShowErrorDialog} from "../../wailsjs/go/network/NetworkApp";
+import { ref, watch } from 'vue'
+import type { InterceptRule, RemoteHTTPConfig, ForwardConfig } from '../types/intercept'
+
 const props = defineProps<{
   visible: boolean
-  initialRule?: InterceptRule
+  rule: InterceptRule
 }>()
 
-const emit = defineEmits(['close', 'save'])
+const emit = defineEmits<{
+  close: []
+  save: [rule: InterceptRule]
+}>()
 
-const rule = reactive<InterceptRule>({
-  id: '',
-  name: '',
-  enabled: true,
-  urlPattern: '',
-  actionType: 'findReplace',
-  findText: '',
-  replaceText: '',
-  useRegex: false,
-  replaceAll: true,
-  responseContent: '',
-  redirectUrl: '',
-  webhookUrl: '',
-  webhookEnabled: false,
-  saveToFile: false,
-  saveFilePath: '',
-  saveFormat: 'jsonl'
+// 创建本地副本
+const localRule = ref<InterceptRule>({ ...props.rule })
+
+// 远程HTTP配置
+const remoteHTTP = ref<RemoteHTTPConfig>({
+  url: '',
+  method: 'POST',
+  timeout: 5000,
+  sendOriginal: false,
+  useResponse: true,
+  bodyTemplate: ''
 })
 
-watch(() => props.initialRule, (newRule) => {
-  if (newRule) {
-    Object.assign(rule, newRule)
-  } else {
-    rule.id = ''
-    rule.name = ''
-    rule.enabled = true
-    rule.urlPattern = ''
-    rule.actionType = 'findReplace'
-    rule.findText = ''
-    rule.replaceText = ''
-    rule.useRegex = false
-    rule.replaceAll = true
-    rule.responseContent = ''
-    rule.redirectUrl = ''
-    rule.webhookUrl = ''
-    rule.webhookEnabled = false
-    rule.saveToFile = false
-    rule.saveFilePath = ''
-    rule.saveFormat = 'jsonl'
-  }
-}, { immediate: true })
+// 请求转发配置
+const forwardConfig = ref<ForwardConfig>({
+  targetUrl: '',
+  replaceHost: true,
+  timeout: 30000,
+  keepPath: true
+})
 
-async function selectSaveFile() {
-  try {
-    const path = await SelectSaveFilePath('captured.jsonl')
-    if (path) {
-      rule.saveFilePath = path
+// 监听visible变化，只在打开时同步数据
+watch(() => props.visible, (newVisible) => {
+  if (newVisible) {
+    localRule.value = { ...props.rule }
+    
+    if (props.rule.remoteHTTP) {
+      remoteHTTP.value = { ...props.rule.remoteHTTP }
+    } else {
+      remoteHTTP.value = {
+        url: '',
+        method: 'POST',
+        timeout: 5000,
+        sendOriginal: false,
+        useResponse: true,
+        bodyTemplate: ''
+      }
     }
-  } catch (error: any) {
-    console.error('选择文件失败:', error)
+    
+    if (props.rule.forwardRequest) {
+      forwardConfig.value = { ...props.rule.forwardRequest }
+    } else {
+      forwardConfig.value = {
+        targetUrl: '',
+        replaceHost: true,
+        timeout: 30000,
+        keepPath: true
+      }
+    }
   }
-}
+})
 
-function handleSave() {
-  if (!rule.name || !rule.urlPattern) {
-    ShowErrorDialog('验证错误', '请填写规则名称和 URL 模式')
-    return
+const handleSave = () => {
+  const ruleToSave = { ...localRule.value }
+  
+  // 如果是remoteHTTP类型，保存配置
+  if (ruleToSave.actionType === 'remoteHTTP') {
+    ruleToSave.remoteHTTP = { ...remoteHTTP.value }
   }
   
-  if (rule.actionType === 'findReplace' && !rule.findText) {
-    ShowErrorDialog('验证错误', '请填写查找内容')
-    return
+  // 如果是请求转发类型，保存配置
+  if (ruleToSave.actionType === 'forwardRequest') {
+    ruleToSave.forwardRequest = { ...forwardConfig.value }
   }
   
-  if (rule.actionType === 'responseReplace' && !rule.responseContent) {
-    ShowErrorDialog('验证错误', '请填写响应内容')
-    return
-  }
-  
-  if (rule.actionType === 'redirect' && !rule.redirectUrl) {
-    ShowErrorDialog('验证错误', '请填写重定向 URL')
-    return
-  }
-  
-  if (rule.actionType === 'saveToFile' && !rule.saveFilePath) {
-    ShowErrorDialog('验证错误', '请填写文件路径')
-    return
-  }
-  
-  if (!rule.id) {
-    rule.id = 'rule-' + Date.now()
-  }
-  
-  emit('save', { ...rule })
+  emit('save', ruleToSave)
 }
 </script>
 
@@ -292,36 +310,28 @@ function handleSave() {
 
 .form-group {
   margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 .form-group label {
-  min-width: 100px;
+  display: block;
+  margin-bottom: 8px;
   font-size: 13px;
   font-weight: 600;
   color: #333;
   text-align: left;
-  flex-shrink: 0;
 }
 
 .form-group input[type="text"],
+.form-group input[type="number"],
 .form-group select,
 .form-group textarea {
-  flex: 1;
+  width: 100%;
   padding: 8px 12px;
   border: 1px solid #dadce0;
   border-radius: 4px;
   font-size: 13px;
   font-family: inherit;
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: #1a73e8;
+  box-sizing: border-box;
 }
 
 .form-group textarea {
@@ -330,16 +340,10 @@ function handleSave() {
 }
 
 .form-group small {
-  flex-basis: 100%;
-  margin-left: 112px;
+  display: block;
+  margin-top: 4px;
   font-size: 11px;
   color: #666;
-  text-align: left;
-}
-
-.form-group:has(textarea),
-.form-group:has(small) {
-  flex-wrap: wrap;
 }
 
 .checkbox-label {
@@ -348,8 +352,6 @@ function handleSave() {
   gap: 8px;
   cursor: pointer;
   font-weight: normal !important;
-  min-width: auto;
-  text-align: left;
 }
 
 .checkbox-label input[type="checkbox"] {
@@ -364,99 +366,32 @@ function handleSave() {
   border-top: 1px solid #e0e0e0;
 }
 
-.footer-btn {
+.btn-secondary,
+.btn-primary {
   flex: 1;
   padding: 10px;
   border: 1px solid #dadce0;
-  background: white;
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
+}
+
+.btn-secondary {
+  background: white;
   color: #5f6368;
 }
 
-.footer-btn:hover {
+.btn-secondary:hover {
   background: #f8f9fa;
 }
 
-.footer-btn.primary {
+.btn-primary {
   background: #1a73e8;
   color: white;
   border-color: #1a73e8;
 }
 
-.footer-btn.primary:hover {
+.btn-primary:hover {
   background: #1557b0;
-}
-
-.examples-section {
-  margin-top: 24px;
-  padding: 16px;
-  background: #f8f9fa;
-  border-radius: 4px;
-  border: 1px solid #e0e0e0;
-}
-
-.examples-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 12px;
-}
-
-.example-item {
-  margin-bottom: 16px;
-  padding: 12px;
-  background: white;
-  border-radius: 4px;
-  border: 1px solid #e0e0e0;
-  text-align: left;
-}
-
-.example-item:last-child {
-  margin-bottom: 0;
-}
-
-.example-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1a73e8;
-  margin-bottom: 6px;
-  text-align: left;
-}
-
-.example-desc {
-  font-size: 12px;
-  color: #666;
-  margin-bottom: 4px;
-  text-align: left;
-}
-
-.example-field {
-  font-size: 12px;
-  color: #333;
-  margin: 4px 0;
-  text-align: left;
-}
-
-.example-code {
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 11px;
-  background: #f1f3f4;
-  padding: 8px;
-  border-radius: 3px;
-  margin-top: 6px;
-  white-space: pre;
-  color: #333;
-  text-align: left;
-}
-
-.example-field code {
-  background: #f1f3f4;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 11px;
-  color: #d93025;
 }
 </style>

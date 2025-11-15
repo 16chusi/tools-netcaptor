@@ -110,6 +110,14 @@ func NewGoProxyServer(port int, capture types.CaptureHandler) *GoProxyServer {
 			}
 		}
 
+		// 检查请求拦截规则（请求转发）
+		if gps.interceptor != nil {
+			if forwardResp, err := gps.interceptor.InterceptRequest(req); err == nil && forwardResp != nil {
+				utils.AppLog.Info(fmt.Sprintf("[GoProxy Request] ✓ 请求已被转发"))
+				return req, forwardResp
+			}
+		}
+
 		gps.recordRequest(req)
 		return req, nil
 	})

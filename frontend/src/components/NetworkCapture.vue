@@ -82,7 +82,7 @@
 
     <InterceptRuleEditor
         :visible="editorVisible"
-        :initialRule="editingRule"
+        :rule="editingRule || { id: '', name: '', enabled: true, urlPattern: '', actionType: 'findReplace' }"
         @close="editorVisible = false"
         @save="saveRule"
     />
@@ -685,7 +685,7 @@ async function saveRulesToStorage() {
   console.log('[前端] 保存规则到后端，数量:', interceptRules.value.length, interceptRules.value)
   // 保存到后端数据库
   try {
-    await SetInterceptRules(interceptRules.value)
+    await SetInterceptRules(interceptRules.value as any)
     console.log('[前端] 规则保存成功')
   } catch (e) {
     console.error('[前端] 规则保存失败:', e)
