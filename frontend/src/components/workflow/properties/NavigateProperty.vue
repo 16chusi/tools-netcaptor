@@ -13,6 +13,15 @@
         <option value="new">新窗口</option>
       </select>
     </div>
+    <div class="form-item">
+      <label>设备模式</label>
+      <select v-model="formData.deviceMode">
+        <option value="desktop">🖥️ 桌面模式</option>
+        <option value="mobile">📱 移动模式 (iPhone)</option>
+        <option value="tablet">📱 平板模式 (iPad)</option>
+      </select>
+      <div class="variable-hint">💡 选择网页显示的设备类型</div>
+    </div>
   </div>
 </template>
 

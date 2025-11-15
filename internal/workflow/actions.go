@@ -65,9 +65,15 @@ func (we *WorkflowExecutor) executeNavigate(step ExecutionStep) (ExecutionResult
 		openMode = mode
 	}
 
+	deviceMode := "desktop"
+	if mode, ok := step.Params["deviceMode"].(string); ok && mode != "" {
+		deviceMode = mode
+	}
+
 	data := map[string]interface{}{
-		"url":      url,
-		"openMode": openMode,
+		"url":        url,
+		"openMode":   openMode,
+		"deviceMode": deviceMode,
 	}
 
 	msg := types.WSMessage{

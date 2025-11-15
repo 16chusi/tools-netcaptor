@@ -39,7 +39,7 @@ export const propertyComponents = {
 export const defaultValues = {
   click: { selectorType: 'css', waitTime: 3000 },
   input: { selectorType: 'css' },
-  navigate: { openMode: 'current' },
+  navigate: { openMode: 'current', deviceMode: 'desktop' },
   scroll: { scrollType: 'bottom', interval: 500 },
   extract: { saveToVariable: 'myData', selectorType: 'css', attribute: 'text' },
   download: { urlSource: 'direct' },
