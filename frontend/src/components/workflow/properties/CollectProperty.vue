@@ -25,7 +25,8 @@
 </template>
 
 <script setup lang="ts">
-import { SelectSaveFilePath } from '../../../../wailsjs/go/main/NetworkApp'
+
+import {SelectSaveFilePath} from "../../../../wailsjs/go/network/NetworkApp";
 
 const props = defineProps<{ formData: any }>()
 

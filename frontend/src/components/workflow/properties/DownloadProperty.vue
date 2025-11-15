@@ -39,7 +39,8 @@
 </template>
 
 <script setup lang="ts">
-import { SelectDownloadDirectory } from '../../../../wailsjs/go/main/NetworkApp'
+
+import {SelectDownloadDirectory} from "../../../../wailsjs/go/network/NetworkApp";
 
 const props = defineProps<{ formData: any }>()
 

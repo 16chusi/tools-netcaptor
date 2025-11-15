@@ -68,7 +68,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { GetAIModels } from '../../../../wailsjs/go/main/NetworkApp'
+import {GetAIModels} from "../../../../wailsjs/go/network/NetworkApp";
 
 defineProps<{ formData: any }>()
 

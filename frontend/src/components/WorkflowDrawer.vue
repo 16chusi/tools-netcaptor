@@ -15,42 +15,42 @@
         </div>
       </div>
       <div class="drawer-content">
-        <StencilPanel 
-          v-if="currentTask" 
-          ref="stencilRef" 
-          :graph="graphInstance" 
-          :visible="stencilVisible"
-          @close="stencilVisible = false"
+        <StencilPanel
+            v-if="currentTask"
+            ref="stencilRef"
+            :graph="graphInstance"
+            :visible="stencilVisible"
+            @close="stencilVisible = false"
         />
         <TaskList
-          :tasks="tasks"
-          :selectedTaskId="selectedTaskId"
-          :runningTaskId="runningTaskId"
-          @select="selectTask"
-          @create="createTask"
-          @copy="copyTask"
-          @delete="deleteTask"
-          @rename="renameTask"
-          @run="runTask"
-          @stop="stopWorkflow"
+            :tasks="tasks"
+            :selectedTaskId="selectedTaskId"
+            :runningTaskId="runningTaskId"
+            @select="selectTask"
+            @create="createTask"
+            @copy="copyTask"
+            @delete="deleteTask"
+            @rename="renameTask"
+            @run="runTask"
+            @stop="stopWorkflow"
         />
         <div class="editor-area">
           <div class="canvas-wrapper">
             <FlowCanvas
-              ref="canvasRef"
-              :task="currentTask"
-              @change="onTaskChange"
-              @selectNode="onSelectNode"
-              @graphReady="onGraphReady"
+                ref="canvasRef"
+                :task="currentTask"
+                @change="onTaskChange"
+                @selectNode="onSelectNode"
+                @graphReady="onGraphReady"
             />
             <PropertyPanel
-              :visible="propertyVisible"
-              :nodeType="selectedNode?.type"
-              :nodeLabel="selectedNode?.label"
-              :nodeData="selectedNode?.data"
-              @close="propertyVisible = false"
-              @save="onSaveNodeData"
-              @updateLabel="onUpdateLabel"
+                :visible="propertyVisible"
+                :nodeType="selectedNode?.type"
+                :nodeLabel="selectedNode?.label"
+                :nodeData="selectedNode?.data"
+                @close="propertyVisible = false"
+                @save="onSaveNodeData"
+                @updateLabel="onUpdateLabel"
             />
           </div>
         </div>
@@ -60,16 +60,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import { Graph } from '@antv/x6'
+import {computed, onMounted, ref, watch} from 'vue'
 import TaskList from './workflow/TaskList.vue'
 import StencilPanel from './workflow/StencilPanel.vue'
 import FlowCanvas from './workflow/FlowCanvas.vue'
 import PropertyPanel from './workflow/PropertyPanel.vue'
-import { toast } from '../utils/toast'
-import { SaveWorkflowTask, GetAllWorkflowTasks, DeleteWorkflowTask, StartWebSocketServer, StopWebSocketServer, GetWebSocketPort, IsWebSocketRunning, IsWorkflowRunning, StopWorkflow, ExecuteWorkflow } from '../../wailsjs/go/main/NetworkApp'
-import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime'
-import { main } from '../../wailsjs/go/models'
+import {toast} from '../utils/toast'
+import {
+  DeleteWorkflowTask,
+  ExecuteWorkflow,
+  GetAllWorkflowTasks,
+  GetWebSocketPort,
+  IsWebSocketRunning,
+  IsWorkflowRunning,
+  SaveWorkflowTask,
+  StartWebSocketServer,
+  StopWebSocketServer,
+  StopWorkflow
+} from "../../wailsjs/go/network/NetworkApp";
+import {EventsOn} from "../../wailsjs/runtime";
+import {workflow} from "../../wailsjs/go/models";
 
 interface WorkflowTask {
   id: string
@@ -105,7 +115,7 @@ const stencilRef = ref<any>(null)
 function onGraphReady(graph: any) {
   graphInstance.value = graph
   console.log('[WorkflowDrawer] Graph 已就绪')
-  
+
   // 初始化 Stencil
   setTimeout(() => {
     if (stencilRef.value?.initStencil) {
@@ -114,8 +124,8 @@ function onGraphReady(graph: any) {
   }, 200)
 }
 
-const currentTask = computed(() => 
-  tasks.value.find(t => t.id === selectedTaskId.value)
+const currentTask = computed(() =>
+    tasks.value.find(t => t.id === selectedTaskId.value)
 )
 
 function selectTask(id: string) {
@@ -131,9 +141,9 @@ async function createTask() {
     nodes: [],
     edges: []
   }
-  
+
   try {
-    const newTask = main.WorkflowTask.createFrom(taskData)
+    const newTask = workflow.WorkflowTask.createFrom(taskData)
     await SaveWorkflowTask(newTask)
     tasks.value.push(taskData)
     selectedTaskId.value = taskData.id
@@ -147,7 +157,7 @@ async function createTask() {
 async function copyTask(id: string) {
   const sourceTask = tasks.value.find(t => t.id === id)
   if (!sourceTask) return
-  
+
   const taskData = {
     id: Date.now().toString(),
     name: `${sourceTask.name} - 副本`,
@@ -157,9 +167,9 @@ async function copyTask(id: string) {
     nodes: JSON.parse(JSON.stringify(sourceTask.nodes)), // 深拷贝
     edges: JSON.parse(JSON.stringify(sourceTask.edges))  // 深拷贝
   }
-  
+
   try {
-    const newTask = main.WorkflowTask.createFrom(taskData)
+    const newTask = workflow.WorkflowTask.createFrom(taskData)
     await SaveWorkflowTask(newTask)
     tasks.value.push(taskData)
     selectedTaskId.value = taskData.id
@@ -171,10 +181,9 @@ async function copyTask(id: string) {
 }
 
 
-
 async function deleteTask(id: string) {
   if (!confirm('确定删除该任务？')) return
-  
+
   try {
     await DeleteWorkflowTask(id)
     tasks.value = tasks.value.filter(t => t.id !== id)
@@ -191,7 +200,7 @@ async function deleteTask(id: string) {
 async function renameTask(id: string, name: string) {
   const task = tasks.value.find(t => t.id === id)
   if (!task) return
-  
+
   task.name = name
   await autoSaveTask(task)
   toast.success('重命名成功')
@@ -207,17 +216,17 @@ async function onTaskChange(task: any) {
     // 检查是否真的有变化，避免不必要的响应式更新
     const currentTask = tasks.value[index]
     const hasChanges = JSON.stringify(currentTask.nodes) !== JSON.stringify(task.nodes) ||
-                      JSON.stringify(currentTask.edges) !== JSON.stringify(task.edges)
-    
+        JSON.stringify(currentTask.edges) !== JSON.stringify(task.edges)
+
     if (!hasChanges) {
       console.log('[WorkflowDrawer] 数据未变化，跳过更新')
       return
     }
-    
+
     // 使用 Object.assign 而不是展开运算符，减少响应式触发
     Object.assign(tasks.value[index], task)
     console.log('[WorkflowDrawer] ✓ 任务已更新到列表')
-    
+
     // 防抖自动保存
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = window.setTimeout(() => {
@@ -229,14 +238,13 @@ async function onTaskChange(task: any) {
 async function autoSaveTask(task: any) {
   try {
     task.updatedAt = new Date().toISOString()
-    const taskToSave = main.WorkflowTask.createFrom(task)
+    const taskToSave = workflow.WorkflowTask.createFrom(task)
     await SaveWorkflowTask(taskToSave)
     console.log('[WorkflowDrawer] ✓ 自动保存成功')
   } catch (error: any) {
     console.error('[WorkflowDrawer] 自动保存失败:', error)
   }
 }
-
 
 
 function onSelectNode(node: any) {
@@ -247,7 +255,7 @@ function onSelectNode(node: any) {
   console.log('[WorkflowDrawer] 节点ID:', node.id)
   console.log('[WorkflowDrawer] 节点类型:', node.type)
   console.log('[WorkflowDrawer] 节点 data:', node.data)
-  
+
   // 确保传递完整的节点数据
   selectedNode.value = {
     id: node.id,
@@ -255,33 +263,33 @@ function onSelectNode(node: any) {
     label: node.label,
     data: node.data || {}
   }
-  
+
   console.log('[WorkflowDrawer] 传递给 PropertyPanel 的数据:', selectedNode.value.data)
   propertyVisible.value = true
 }
 
 function onSaveNodeData(data: Record<string, any>) {
   if (!selectedNode.value || !graphInstance.value) return
-  
+
   console.log('[WorkflowDrawer] ========== 保存节点数据 ==========')
   console.log('[WorkflowDrawer] 节点ID:', selectedNode.value.id)
   console.log('[WorkflowDrawer] 节点类型:', selectedNode.value.type)
   console.log('[WorkflowDrawer] 保存的数据:', data)
-  
+
   const node = graphInstance.value.getCellById(selectedNode.value.id)
   if (node) {
     const currentData = node.getData() || {}
     console.log('[WorkflowDrawer] 当前节点数据:', currentData)
-    
-    const updatedData = { ...currentData, ...data }
+
+    const updatedData = {...currentData, ...data}
     console.log('[WorkflowDrawer] 合并后的数据:', updatedData)
-    
+
     node.setData(updatedData)
-    
+
     const verifyData = node.getData()
     console.log('[WorkflowDrawer] 验证保存后的数据:', verifyData)
     console.log('[WorkflowDrawer] ✓ 节点数据已更新')
-    
+
     // 触发 change 事件
     const pos = node.position()
     node.position(pos.x + 0.01, pos.y)
@@ -289,18 +297,18 @@ function onSaveNodeData(data: Record<string, any>) {
   } else {
     console.error('[WorkflowDrawer] ❌ 未找到节点:', selectedNode.value.id)
   }
-  
-  selectedNode.value.data = { ...selectedNode.value.data, ...data }
+
+  selectedNode.value.data = {...selectedNode.value.data, ...data}
 }
 
 function onUpdateLabel(label: string) {
   if (!selectedNode.value || !graphInstance.value) return
-  
+
   const node = graphInstance.value.getCellById(selectedNode.value.id)
   if (node) {
     node.attr('label/text', label)
     const currentData = node.getData() || {}
-    node.setData({ ...currentData, customLabel: label })
+    node.setData({...currentData, customLabel: label})
   }
 }
 
@@ -326,7 +334,7 @@ onMounted(async () => {
   loadTasks()
   await checkWebSocketStatus()
   await checkWorkflowStatus()
-  
+
   EventsOn('workflow_status', (status: any) => {
     console.log('[WorkflowDrawer] 收到工作流状态:', status)
     if (status.status === 'running') {
@@ -356,16 +364,16 @@ async function checkWorkflowStatus() {
 async function runTask(taskId: string) {
   const task = tasks.value.find(t => t.id === taskId)
   if (!task) return
-  
+
   const wsRunning = await IsWebSocketRunning()
   if (!wsRunning) {
     toast.error('请先启动 WebSocket 服务')
     return
   }
-  
+
   try {
     runningTaskId.value = taskId
-    const taskToRun = main.WorkflowTask.createFrom(task)
+    const taskToRun = workflow.WorkflowTask.createFrom(task)
     await ExecuteWorkflow(taskToRun)
     // ExecuteWorkflow 在后端异步执行，不会等待完成
     // 实际状态通过 workflow_status 事件更新
@@ -457,8 +465,12 @@ async function copyPort() {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .drawer-header {

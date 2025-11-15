@@ -19,7 +19,7 @@
         
         <div class="tab-content">
           <!-- 基础设置 -->
-          <div v-if="activeTab === 'basic'" class="tab-panel">
+          <div v-show="activeTab === 'basic'" class="tab-panel">
             <div class="setting-item">
               <label>代理端口</label>
               <input 
@@ -81,17 +81,17 @@
         </div>
         
         <!-- 智能代理规则 -->
-        <div v-if="activeTab === 'smart-proxy'" class="tab-panel">
+        <div v-show="activeTab === 'smart-proxy'" class="tab-panel">
           <SmartProxyTab />
         </div>
         
         <!-- 网络代理设置 -->
-        <div v-if="activeTab === 'proxy'" class="tab-panel">
+        <div v-show="activeTab === 'proxy'" class="tab-panel">
           <ProxyTab />
         </div>
         
         <!-- AI模型设置 -->
-        <div v-if="activeTab === 'ai'" class="tab-panel">
+        <div v-show="activeTab === 'ai'" class="tab-panel">
           <AIModelTab />
         </div>
       </div>
@@ -105,7 +105,7 @@ import { ref, watch } from 'vue'
 import AIModelTab from './tabs/AIModelTab.vue'
 import ProxyTab from './tabs/ProxyTab.vue'
 import SmartProxyTab from './tabs/SmartProxyTab.vue'
-import {GetMaxHistoryEntries, SetMaxHistoryEntries} from "../../wailsjs/go/main/NetworkApp";
+import {GetMaxHistoryEntries, SetMaxHistoryEntries} from "../../wailsjs/go/network/NetworkApp";
 
 const props = defineProps<{
   visible: boolean

@@ -199,6 +199,30 @@
 </template>
 
 <script setup lang="ts">
+import {
+  ClearCapture,
+  DownloadResponse,
+  ExportData,
+  GetAllEntries,
+  GetCACertInfo,
+  GetCACertPath,
+  GetInterceptRules,
+  GetProxyURL,
+  GetWebhookPort,
+  GetWebSocketPort,
+  IsProxyRunning,
+  IsWebhookRunning,
+  IsWebSocketRunning,
+  OpenInChrome,
+  OpenInEdge,
+  OpenInFirefox,
+  SelectDownloadDirectory, SetInterceptRules,
+  ShowErrorDialog,
+  ShowInfoDialog, ShowQuestionDialog,
+  StartProxyWithPort, StartWebhookServer, StartWebSocketServer,
+  StopProxy, StopWebhookServer, StopWebSocketServer
+} from "../../wailsjs/go/network/NetworkApp";
+
 interface CertInfo {
   exists: boolean
   path: string
@@ -210,33 +234,6 @@ interface CertInfo {
 }
 
 import {computed, onMounted, onUnmounted, ref} from 'vue'
-import {
-  ClearCapture,
-  DownloadResponse,
-  ExportData,
-  GetAllEntries,
-  GetCACertPath,
-  GetCACertInfo,
-  GetProxyURL,
-  GetWebSocketPort,
-  GetWebhookPort,
-  IsProxyRunning,
-  IsWebSocketRunning,
-  IsWebhookRunning,
-  OpenInChrome,
-  OpenInEdge,
-  OpenInFirefox,
-  SelectDownloadDirectory,
-  SetInterceptRules,
-  StartProxyWithPort,
-  StartWebSocketServer,
-  StartWebhookServer,
-  StopProxy,
-  StopWebSocketServer,
-  StopWebhookServer
-} from '../../wailsjs/go/main/NetworkApp'
-import {BrowserOpenURL} from '../../wailsjs/runtime/runtime'
-import {ShowErrorDialog, ShowInfoDialog, ShowQuestionDialog} from '../../wailsjs/go/main/NetworkApp'
 import {formatSize, getDomain, getFormatType, getPath, getResourceType, getStatusClass} from '../utils/networkUtils'
 import {generateCurl, generateFetch, generatePowerShell} from '../utils/codeGenerator'
 import {toBase64, toHex} from '../utils/formatters'
@@ -253,6 +250,7 @@ import WorkflowDrawer from './WorkflowDrawer.vue'
 import { parseRequestCookies, parseResponseCookies } from '../utils/cookieUtils'
 import { copyJSON, copyToClipboard } from '../utils/clipboardUtils'
 import type { InterceptRule } from '../types/intercept'
+import {BrowserOpenURL} from "../../wailsjs/runtime";
 
 
 const entries = ref<any[]>([])
@@ -684,27 +682,26 @@ function exportRules() {
 }
 
 async function saveRulesToStorage() {
-  localStorage.setItem('interceptRules', JSON.stringify(interceptRules.value))
   console.log('[前端] 保存规则到后端，数量:', interceptRules.value.length, interceptRules.value)
-  // 同步到后端
+  // 保存到后端数据库
   try {
     await SetInterceptRules(interceptRules.value)
-    console.log('[前端] 规则同步成功')
+    console.log('[前端] 规则保存成功')
   } catch (e) {
-    console.error('[前端] 规则同步失败:', e)
+    console.error('[前端] 规则保存失败:', e)
   }
 }
 
-function loadRulesFromStorage() {
-  const stored = localStorage.getItem('interceptRules')
-  console.log('[前端] 从 localStorage 加载规则:', stored)
-  if (stored) {
-    try {
-      interceptRules.value = JSON.parse(stored)
-      console.log('[前端] 解析后的规则数量:', interceptRules.value.length)
-    } catch (e) {
-      console.error('[前端] 加载规则失败:', e)
+async function loadRulesFromStorage() {
+  console.log('[前端] 从后端加载规则')
+  try {
+    const rules = await GetInterceptRules()
+    if (rules && rules.length > 0) {
+      interceptRules.value = rules
+      console.log('[前端] 加载了', rules.length, '条规则')
     }
+  } catch (e) {
+    console.error('[前端] 加载规则失败:', e)
   }
 }
 

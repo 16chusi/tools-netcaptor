@@ -13,12 +13,10 @@ import {onMounted, onUnmounted, ref, watch} from 'vue'
 import {Graph} from '@antv/x6'
 import {Dnd} from '@antv/x6-plugin-dnd'
 import {NODE_CONFIGS} from './nodeConfigs'
-import {ExecuteWorkflow, IsWebSocketRunning, StopWorkflow} from '../../../wailsjs/go/main/NetworkApp'
-import {EventsOn} from '../../../wailsjs/runtime/runtime'
-import {main} from '../../../wailsjs/go/models'
 import {toast} from '../../utils/toast';
-
-type WorkflowTask = main.WorkflowTask
+import {EventsOn} from "../../../wailsjs/runtime";
+import {workflow} from "../../../wailsjs/go/models";
+import WorkflowTask = workflow.WorkflowTask;
 
 const props = defineProps<{
   task?: any
@@ -62,12 +60,21 @@ onMounted(() => {
   EventsOn('workflow_error', (data: any) => {
     console.error('[FlowCanvas] 工作流错误:', data.error)
     const errorMsg = data.error || '未知错误'
-    if (errorMsg.includes('超时') || errorMsg.includes('timeout')) {
-      toast.error('执行超时：浏览器扩展未响应，请检查扩展是否已安装并连接')
-    } else if (errorMsg.includes('未连接') || errorMsg.includes('not connected')) {
-      toast.error('浏览器扩展未连接，请先安装并启用扩展')
+    
+    // 提取错误信息（去除节点ID等前缀）
+    let displayMsg = errorMsg
+    const match = errorMsg.match(/- (.+)$/)
+    if (match) {
+      displayMsg = match[1]
+    }
+    
+    // 根据错误类型显示不同提示
+    if (errorMsg.includes('没有浏览器扩展连接') || errorMsg.includes('未连接') || errorMsg.includes('not connected')) {
+      toast.error('❌ 浏览器扩展未连接\n请先安装并启用Chrome扩展')
+    } else if (errorMsg.includes('超时') || errorMsg.includes('timeout')) {
+      toast.error('⏱️ 执行超时\n浏览器扩展未响应，请检查扩展状态')
     } else {
-      toast.error('执行失败: ' + errorMsg)
+      toast.error('❌ 执行失败\n' + displayMsg)
     }
     isRunning.value = false
   })
@@ -78,8 +85,12 @@ onUnmounted(() => {
 })
 
 watch(() => props.task, (newTask, oldTask) => {
-  if (newTask && graph && newTask.id !== oldTask?.id) {
-    loadTask(newTask)
+  if (newTask && graph) {
+    // 如果是不同的任务，或者是首次加载，都重新加载
+    if (!oldTask || newTask.id !== oldTask.id) {
+      console.log('[FlowCanvas] 切换任务:', oldTask?.id, '->', newTask.id)
+      loadTask(newTask)
+    }
   }
 }, { deep: false })
 

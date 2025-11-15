@@ -46,16 +46,6 @@ export function applyDefaultValues(formData: Record<string, any>, nodeType: stri
   }
 }
 
-// 加载AI模型配置
-export function loadAIModels() {
-  const saved = localStorage.getItem('ai-model-settings')
-  if (saved) {
-    const settings = JSON.parse(saved)
-    return settings.models || []
-  }
-  return []
-}
-
 // 防抖保存函数
 export function createDebouncedSave(callback: (data: any) => void, delay = 300) {
   let timer: number | null = null

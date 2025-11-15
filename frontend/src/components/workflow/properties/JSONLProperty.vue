@@ -26,7 +26,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { SelectJSONLFile, LoadJSONLFile } from '../../../../wailsjs/go/main/NetworkApp'
+import {LoadJSONLFile, SelectJSONLFile} from "../../../../wailsjs/go/network/NetworkApp";
 
 const props = defineProps<{ formData: any }>()
 

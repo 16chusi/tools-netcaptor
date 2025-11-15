@@ -139,8 +139,7 @@
 <script setup lang="ts">
 import { reactive, watch } from 'vue'
 import type { InterceptRule } from '../types/intercept'
-import {ShowErrorDialog, SelectSaveFilePath} from '../../wailsjs/go/main/NetworkApp'
-
+import {SelectSaveFilePath, ShowErrorDialog} from "../../wailsjs/go/network/NetworkApp";
 const props = defineProps<{
   visible: boolean
   initialRule?: InterceptRule

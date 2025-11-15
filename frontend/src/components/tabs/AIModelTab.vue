@@ -77,7 +77,13 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, reactive } from 'vue'
 import { toast } from '../../utils/toast'
-import { TestAIModel, UpdateAIModels, GetAIModels, CallAI, ShowQuestionDialog } from '../../../wailsjs/go/main/NetworkApp'
+import {
+  CallAI,
+  GetAIModels,
+  ShowQuestionDialog,
+  TestAIModel,
+  UpdateAIModels
+} from "../../../wailsjs/go/network/NetworkApp";
 
 interface AIModel {
   provider: string
@@ -170,21 +176,13 @@ async function testAndSaveModel(index: number) {
     testingStates[index] = true
     
     try {
-      // 第一步：测试连接
-      console.log('[前端] 步骤1: 测试模型连接...')
+      console.log('[前端] 测试模型连接...')
       await TestAIModel(model)
       
-      // 第二步：AI响应测试
-      console.log('[前端] 步骤2: 测试AI响应...')
-      await UpdateAIModels(models.value) // 先更新配置
-      const result = await CallAI(index, "Hello", "You are a helpful assistant. Reply with just 'OK'.")
-      
-      // 第三步：保存到数据库
-      console.log('[前端] 步骤3: 保存配置到数据库...')
+      console.log('[前端] 保存配置到数据库...')
       await saveModels()
       
-      setTestResult(index, 'success', '测试成功并已保存', 
-        `连接正常，AI响应: ${result.substring(0, 50)}${result.length > 50 ? '...' : ''}`)
+      setTestResult(index, 'success', '测试成功并已保存', '连接正常')
       
     } catch (error: any) {
       console.error('[前端] 测试或保存失败:', error)
@@ -199,55 +197,23 @@ async function saveModels() {
   try {
     // 保存到后端数据库
     await UpdateAIModels(models.value)
-    // 同时保存到localStorage作为备份
-    saveSettings()
+    toast.success('AI模型设置已保存')
   } catch (error) {
     console.error('保存模型配置失败:', error)
     throw error
   }
 }
 
-function saveSettings() {
-  const settings = {
-    models: models.value,
-    defaultModel: defaultModel.value,
-    defaultTemperature: defaultTemperature.value,
-    defaultMaxTokens: defaultMaxTokens.value
-  }
-  
-  localStorage.setItem('ai-model-settings', JSON.stringify(settings))
-  toast.success('AI模型设置已保存')
-}
-
-function loadSettings() {
-  const saved = localStorage.getItem('ai-model-settings')
-  if (saved) {
-    const settings = JSON.parse(saved)
-    models.value = settings.models || []
-    defaultModel.value = settings.defaultModel || 0
-    defaultTemperature.value = settings.defaultTemperature || 0.7
-    defaultMaxTokens.value = settings.defaultMaxTokens || 2000
-  }
-  
-  if (models.value.length === 0) {
-    addModel()
-  }
-}
-
+// 加载模型配置
 onMounted(async () => {
   try {
-    // 从后端数据库加载
-    const savedModels = await GetAIModels()
-    if (savedModels && savedModels.length > 0) {
-      models.value = savedModels
-      console.log('[AIModelTab] 从数据库加载了', savedModels.length, '个模型')
-    } else {
-      // 如果数据库为空，尝试从 localStorage 加载
-      loadSettings()
+    const loadedModels = await GetAIModels()
+    if (loadedModels && loadedModels.length > 0) {
+      models.value = loadedModels
+      console.log('[AIModelTab] 已加载', loadedModels.length, '个模型配置')
     }
   } catch (error) {
-    console.error('[AIModelTab] 加载模型失败，使用 localStorage:', error)
-    loadSettings()
+    console.error('[AIModelTab] 加载模型配置失败:', error)
   }
 })
 
@@ -256,7 +222,6 @@ watch([models, defaultModel, defaultTemperature, defaultMaxTokens], () => {
   debounce('auto-save', async () => {
     try {
       await UpdateAIModels(models.value)
-      saveSettings() // 同时保存到 localStorage 作为备份
     } catch (error) {
       console.error('自动保存失败:', error)
     }

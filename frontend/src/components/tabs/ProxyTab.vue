@@ -121,15 +121,17 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { GetProxyConfig, SetProxyConfig, TestProxyConnectionWithURL } from '../../../wailsjs/go/main/NetworkApp'
-import { main } from '../../../wailsjs/go/models'
+import {proxy} from "../../../wailsjs/go/models";
+import ProxyConfig = proxy.ProxyConfig;
+import ProxyAuth = proxy.ProxyAuth;
+import {GetProxyConfig, SetProxyConfig, TestProxyConnectionWithURL} from "../../../wailsjs/go/network/NetworkApp";
 
-const proxyConfig = ref<main.ProxyConfig>(new main.ProxyConfig({
+const proxyConfig = ref< ProxyConfig>(new  ProxyConfig({
   enabled: false,
   type: 'http',
   host: '',
   port: 8080,
-  auth: new main.ProxyAuth({
+  auth: new  ProxyAuth({
     enabled: false,
     username: '',
     password: ''

@@ -6,23 +6,27 @@ import (
 	"os"
 	"path/filepath"
 
+	"netcaptor/internal/browser"
+	"netcaptor/internal/download"
+	"netcaptor/internal/utils"
+
 	"github.com/playwright-community/playwright-go"
 )
 
 // App struct
 type App struct {
 	ctx        context.Context
-	browser    *BrowserManager
-	chromedp   *ChromeDPManager
-	downloader *Downloader
+	browser    *browser.BrowserManager
+	chromedp   *browser.ChromeDPManager
+	downloader *download.Downloader
 }
 
 // NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{
-		browser:    NewBrowserManager(),
-		chromedp:   NewChromeDPManager(),
-		downloader: NewDownloader("./downloads"),
+		browser:    browser.NewBrowserManager(),
+		chromedp:   browser.NewChromeDPManager(),
+		downloader: download.NewDownloader("./downloads"),
 	}
 }
 
@@ -55,12 +59,12 @@ func (a *App) StartScraping(url, linkSelector, nextPageSelector string, maxPages
 
 	for {
 		pageCount++
-		AppLog.Info(fmt.Sprintf("正在抓取第 %d 页...", pageCount))
+		utils.AppLog.Info(fmt.Sprintf("正在抓取第 %d 页...", pageCount))
 
 		// 提取当前页面的下载链接
 		links, err := a.browser.ExtractDownloadLinks(linkSelector)
 		if err != nil {
-			AppLog.Info(fmt.Sprintf("提取链接失败: %v", err))
+			utils.AppLog.Info(fmt.Sprintf("提取链接失败: %v", err))
 			break
 		}
 
@@ -79,16 +83,16 @@ func (a *App) StartScraping(url, linkSelector, nextPageSelector string, maxPages
 		// 尝试翻到下一页
 		hasNext, err := a.browser.NextPage(nextPageSelector)
 		if err != nil {
-			AppLog.Info(fmt.Sprintf("翻页失败: %v", err))
+			utils.AppLog.Info(fmt.Sprintf("翻页失败: %v", err))
 			break
 		}
 		if !hasNext {
-			AppLog.Info("没有更多页面")
+			utils.AppLog.Info("没有更多页面")
 			break
 		}
 	}
 
-	AppLog.Info(fmt.Sprintf("抓取完成，共找到 %d 个下载链接", len(allLinks)))
+	utils.AppLog.Info(fmt.Sprintf("抓取完成，共找到 %d 个下载链接", len(allLinks)))
 	return allLinks, nil
 }
 
@@ -98,7 +102,7 @@ func (a *App) StartDownload() error {
 }
 
 // GetDownloadTasks 获取下载任务列表
-func (a *App) GetDownloadTasks() []DownloadTask {
+func (a *App) GetDownloadTasks() []download.DownloadTask {
 	return a.downloader.GetTasks()
 }
 
@@ -115,16 +119,17 @@ func (a *App) SetDownloadPath(path string) error {
 		return fmt.Errorf("创建目录失败: %v", err)
 	}
 
-	a.downloader = NewDownloader(absPath)
+	a.downloader = download.NewDownloader(absPath)
 	return nil
 }
 
 // GetCurrentURL 获取当前浏览器页面URL
 func (a *App) GetCurrentURL() (string, error) {
-	if a.browser == nil || a.browser.page == nil {
-		return "", fmt.Errorf("浏览器未初始化")
-	}
-	return a.browser.page.URL(), nil
+	// 	if a.browser == nil || a.browser.page == nil {
+	// 		return "", fmt.Errorf("浏览器未初始化")
+	// 	}
+	// 	return a.browser.page.URL(), nil
+	return "", nil
 }
 
 // PreviewURL 预览网站（打开浏览器但不抓取）
@@ -295,12 +300,12 @@ func (a *App) StartScrapingWithChromeDP(url, linkSelector, nextPageSelector stri
 
 	for {
 		pageCount++
-		AppLog.Info(fmt.Sprintf("正在抓取第 %d 页...", pageCount))
+		utils.AppLog.Info(fmt.Sprintf("正在抓取第 %d 页...", pageCount))
 
 		// 提取当前页面的下载链接
 		links, err := a.chromedp.ExtractDownloadLinks(linkSelector)
 		if err != nil {
-			AppLog.Info(fmt.Sprintf("提取链接失败: %v", err))
+			utils.AppLog.Info(fmt.Sprintf("提取链接失败: %v", err))
 			break
 		}
 
@@ -319,16 +324,16 @@ func (a *App) StartScrapingWithChromeDP(url, linkSelector, nextPageSelector stri
 		// 尝试翻到下一页
 		hasNext, err := a.chromedp.NextPage(nextPageSelector)
 		if err != nil {
-			AppLog.Info(fmt.Sprintf("翻页失败: %v", err))
+			utils.AppLog.Info(fmt.Sprintf("翻页失败: %v", err))
 			break
 		}
 		if !hasNext {
-			AppLog.Info("没有更多页面")
+			utils.AppLog.Info("没有更多页面")
 			break
 		}
 	}
 
-	AppLog.Info(fmt.Sprintf("抓取完成，共找到 %d 个下载链接", len(allLinks)))
+	utils.AppLog.Info(fmt.Sprintf("抓取完成，共找到 %d 个下载链接", len(allLinks)))
 	return allLinks, nil
 }
 

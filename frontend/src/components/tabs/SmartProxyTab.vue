@@ -87,10 +87,16 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { GetSmartProxyRules, AddSmartProxyRule, RemoveSmartProxyRule, ClearAutoLearnedRules, TestSmartProxyRouting } from '../../../wailsjs/go/main/NetworkApp'
-import { main } from '../../../wailsjs/go/models'
+import {proxy} from "../../../wailsjs/go/models";
+import RouteRule = proxy.RouteRule;
+import {
+  AddSmartProxyRule,
+  ClearAutoLearnedRules,
+  GetSmartProxyRules,
+  RemoveSmartProxyRule, TestSmartProxyRouting
+} from "../../../wailsjs/go/network/NetworkApp";
 
-const rules = ref<main.RouteRule[]>([])
+const rules = ref< RouteRule[]>([])
 const newRule = ref({
   pattern: '',
   routeType: 'proxy'

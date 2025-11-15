@@ -30,8 +30,8 @@
 
 <script setup lang="ts">
 import { ref, watch, computed, nextTick, onMounted } from 'vue'
-import { SelectDownloadDirectory, SelectJSONLFile, LoadJSONLFile } from '../../../wailsjs/go/main/NetworkApp'
 import { propertyComponents, defaultValues } from './properties/index'
+import {LoadJSONLFile, SelectDownloadDirectory, SelectJSONLFile} from "../../../wailsjs/go/network/NetworkApp";
 
 const props = defineProps<{
   visible: boolean
